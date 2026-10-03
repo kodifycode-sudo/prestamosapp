@@ -1,3 +1,4 @@
+import { formatFecha } from "@/lib/fechas";
 import { notFound, redirect } from "next/navigation";
 import prisma from "@/libs/prisma";
 import { getUserFromToken } from "@/utils/getUserFromToken";
@@ -95,7 +96,7 @@ export default async function SimulacionDetailPage({
             {cuotas.map((cuota) => (
               <TableRow key={cuota.numero}>
                 <TableCell>{cuota.numero}</TableCell>
-                <TableCell>{cuota.fechaVencimiento.toLocaleDateString("es-AR")}</TableCell>
+                <TableCell>{formatFecha(cuota.fechaVencimiento)}</TableCell>
                 <TableCell>{formatMonto(cuota.montoCapital)}</TableCell>
                 <TableCell>{formatMonto(cuota.montoInteres)}</TableCell>
                 <TableCell>{formatMonto(cuota.montoTotal)}</TableCell>

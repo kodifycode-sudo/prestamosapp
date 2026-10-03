@@ -1,4 +1,13 @@
-import { startOfDay, endOfDay, startOfMonth, endOfMonth, subDays, addDays, format } from "date-fns";
+import {
+  fechaCalendarioDe,
+  formatFecha,
+  hoyCalendario,
+  inicioDelDia,
+  inicioMesCalendario,
+  inicioMesSiguienteCalendario,
+  rangoDeDias,
+  sumarDias,
+} from "@/lib/fechas";
 import prisma from "@/libs/prisma";
 import type { TokenPayload } from "@/utils/getUserFromToken";
 import { scopeEmpresa } from "@/lib/scope";
@@ -7,11 +16,15 @@ export async function getDashboardStats(user: TokenPayload) {
   const scopePrestamo = scopeEmpresa(user);
   const scopePago = scopeEmpresa(user);
 
-  const hoy = new Date();
-  const inicioHoy = startOfDay(hoy);
-  const finHoy = endOfDay(hoy);
-  const inicioMes = startOfMonth(hoy);
-  const finMes = endOfMonth(hoy);
+  // "Hoy" y "este mes" en la zona del negocio: los vencimientos se comparan como
+  // fechas de calendario y los pagos (instantes) por el rango de horas de esos días.
+  const hoy = hoyCalendario();
+  const rangoHoy = rangoDeDias(hoy, hoy);
+  const rangoMes = {
+    gte: inicioDelDia(inicioMesCalendario(hoy)),
+    lt: inicioDelDia(inicioMesSiguienteCalendario(hoy)),
+  };
+  const diaMes = (fecha: Date) => formatFecha(fecha).slice(0, 5);
 
   const prestamosActivos = await prisma.prestamo.count({
     where: { ...scopePrestamo, estado: "ACTIVO" },
@@ -24,24 +37,24 @@ export async function getDashboardStats(user: TokenPayload) {
     select: { montoTotal: true, montoPagado: true },
   });
   const pagosHoy = await prisma.pago.aggregate({
-    where: { ...scopePago, fechaPago: { gte: inicioHoy, lte: finHoy } },
+    where: { ...scopePago, fechaPago: rangoHoy },
     _sum: { monto: true },
   });
   const pagosMes = await prisma.pago.aggregate({
-    where: { ...scopePago, fechaPago: { gte: inicioMes, lte: finMes } },
+    where: { ...scopePago, fechaPago: rangoMes },
     _sum: { monto: true },
   });
   const cuotasAtrasadas = await prisma.cuota.count({
     where: {
       estado: { not: "PAGADA" },
-      fechaVencimiento: { lt: inicioHoy },
+      fechaVencimiento: { lt: hoy },
       prestamo: { ...scopePrestamo, estado: "ACTIVO" },
     },
   });
   const proximasCuotas = await prisma.cuota.findMany({
     where: {
       estado: { not: "PAGADA" },
-      fechaVencimiento: { gte: inicioHoy, lte: addDays(inicioHoy, 7) },
+      fechaVencimiento: { gte: hoy, lte: sumarDias(hoy, 7) },
       prestamo: { ...scopePrestamo, estado: "ACTIVO" },
     },
     include: {
@@ -51,7 +64,7 @@ export async function getDashboardStats(user: TokenPayload) {
     take: 20,
   });
   const pagosUltimos14Dias = await prisma.pago.findMany({
-    where: { ...scopePago, fechaPago: { gte: subDays(inicioHoy, 13), lte: finHoy } },
+    where: { ...scopePago, fechaPago: rangoDeDias(sumarDias(hoy, -13), hoy) },
     select: { monto: true, fechaPago: true },
   });
 
@@ -62,10 +75,10 @@ export async function getDashboardStats(user: TokenPayload) {
 
   const cobrosPorDiaMap = new Map<string, number>();
   for (let i = 13; i >= 0; i--) {
-    cobrosPorDiaMap.set(format(subDays(inicioHoy, i), "dd/MM"), 0);
+    cobrosPorDiaMap.set(diaMes(sumarDias(hoy, -i)), 0);
   }
   for (const pago of pagosUltimos14Dias) {
-    const key = format(pago.fechaPago, "dd/MM");
+    const key = diaMes(fechaCalendarioDe(pago.fechaPago));
     cobrosPorDiaMap.set(key, (cobrosPorDiaMap.get(key) ?? 0) + Number(pago.monto));
   }
 

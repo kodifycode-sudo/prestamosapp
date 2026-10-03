@@ -2,14 +2,15 @@ import { redirect } from "next/navigation";
 import { getUserFromToken } from "@/utils/getUserFromToken";
 import { getCuotasDelMes } from "@/lib/calendario-queries";
 import { CalendarioCuotas } from "./calendario-cuotas";
+import { claveFecha, hoyCalendario, inicioMesCalendario } from "@/lib/fechas";
 
+/** Primer día del mes como fecha de calendario (00:00 UTC); por defecto, el mes en curso en la zona del negocio. */
 function parseMes(value?: string) {
   if (value && /^\d{4}-\d{2}$/.test(value)) {
     const [year, month] = value.split("-").map(Number);
-    return new Date(year, month - 1, 1);
+    return new Date(Date.UTC(year, month - 1, 1));
   }
-  const hoy = new Date();
-  return new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+  return inicioMesCalendario(hoyCalendario());
 }
 
 export default async function CalendarioPage({
@@ -24,7 +25,7 @@ export default async function CalendarioPage({
   const cuotas = await getCuotasDelMes(user, mesDeReferencia);
   // Se pasa como "yyyy-MM" (no ISO/UTC) para que el cliente lo parsee en hora local
   // y la navegación de meses no dependa de la zona horaria del servidor (UTC en Vercel).
-  const mesParam = `${mesDeReferencia.getFullYear()}-${String(mesDeReferencia.getMonth() + 1).padStart(2, "0")}`;
+  const mesParam = claveFecha(mesDeReferencia).slice(0, 7);
 
   return (
     <div className="space-y-6">

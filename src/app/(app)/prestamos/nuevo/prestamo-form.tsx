@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { CUOTAS_MAXIMAS, MENSAJE_CUOTAS_MAXIMAS, MENSAJE_MONTO_MAXIMO, MONTO_MAXIMO } from "@/lib/limites";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -57,9 +58,9 @@ const SIN_FUENTE = "SIN_FUENTE";
 const prestamoSchema = z.object({
   clienteId: z.string().min(1, "Seleccioná un cliente"),
   fuenteIngresoId: z.string().optional(),
-  monto: z.coerce.number().positive("El monto debe ser mayor a 0").transform(Math.round),
-  interes: z.coerce.number().min(0, "El interés no puede ser negativo").transform(Math.round),
-  cantidadCuotas: z.coerce.number().int().min(1, "Debe haber al menos 1 cuota"),
+  monto: z.coerce.number().positive("El monto debe ser mayor a 0").max(MONTO_MAXIMO, MENSAJE_MONTO_MAXIMO).transform(Math.round),
+  interes: z.coerce.number().min(0, "El interés no puede ser negativo").max(MONTO_MAXIMO, MENSAJE_MONTO_MAXIMO).transform(Math.round),
+  cantidadCuotas: z.coerce.number().int().min(1, "Debe haber al menos 1 cuota").max(CUOTAS_MAXIMAS, MENSAJE_CUOTAS_MAXIMAS),
   frecuencia: z.enum(["DIARIA", "SEMANAL", "QUINCENAL", "MENSUAL"]),
   fechaInicio: z.string().min(1, "Obligatorio"),
 });
@@ -98,6 +99,7 @@ export function PrestamoForm({
 
   const simulacion = useMemo(() => {
     if (!values.monto || !values.cantidadCuotas || !values.fechaInicio) return [];
+    if (Number(values.cantidadCuotas) > CUOTAS_MAXIMAS) return [];
     try {
       return generarCuotas({
         monto: Number(values.monto),

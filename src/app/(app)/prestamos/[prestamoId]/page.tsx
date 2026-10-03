@@ -1,3 +1,4 @@
+import { formatFecha, hoyCalendario } from "@/lib/fechas";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import prisma from "@/libs/prisma";
@@ -53,7 +54,7 @@ export default async function PrestamoDetailPage({
     orderBy: { numero: "asc" },
   });
 
-  const hoy = new Date();
+  const hoy = hoyCalendario();
   const saldoPendiente = cuotas.reduce(
     (sum, c) => (c.estado !== "PAGADA" ? sum + (Number(c.montoTotal) - Number(c.montoPagado)) : sum),
     0
@@ -153,7 +154,7 @@ export default async function PrestamoDetailPage({
               return (
                 <TableRow key={cuota.id}>
                   <TableCell>{cuota.numero}</TableCell>
-                  <TableCell>{cuota.fechaVencimiento.toLocaleDateString("es-AR")}</TableCell>
+                  <TableCell>{formatFecha(cuota.fechaVencimiento)}</TableCell>
                   <TableCell>{formatMonto(Number(cuota.montoCapital))}</TableCell>
                   <TableCell>{formatMonto(Number(cuota.montoInteres))}</TableCell>
                   <TableCell>{formatMonto(Number(cuota.montoTotal))}</TableCell>

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { CUOTAS_MAXIMAS, MENSAJE_CUOTAS_MAXIMAS, MENSAJE_MONTO_MAXIMO, MONTO_MAXIMO } from "@/lib/limites";
 import prisma from "@/libs/prisma";
 import { getUserFromToken, type TokenPayload } from "@/utils/getUserFromToken";
 import { auditDelete, auditUpdate } from "@/utils/auditoria";
@@ -9,9 +10,9 @@ export const dynamic = "force-dynamic";
 const simulacionUpdateSchema = z.object({
   clienteNombre: z.string().min(1).optional(),
   clienteEmail: z.string().email().optional().or(z.literal("")),
-  monto: z.coerce.number().positive().transform(Math.round).optional(),
-  interes: z.coerce.number().min(0).transform(Math.round).optional(),
-  cantidadCuotas: z.coerce.number().int().min(1).optional(),
+  monto: z.coerce.number().positive().max(MONTO_MAXIMO, MENSAJE_MONTO_MAXIMO).transform(Math.round).optional(),
+  interes: z.coerce.number().min(0).max(MONTO_MAXIMO, MENSAJE_MONTO_MAXIMO).transform(Math.round).optional(),
+  cantidadCuotas: z.coerce.number().int().min(1).max(CUOTAS_MAXIMAS, MENSAJE_CUOTAS_MAXIMAS).optional(),
   frecuencia: z.enum(["DIARIA", "SEMANAL", "QUINCENAL", "MENSUAL"]).optional(),
   fechaInicio: z.coerce.date().optional(),
 });

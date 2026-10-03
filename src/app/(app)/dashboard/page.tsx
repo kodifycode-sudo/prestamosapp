@@ -1,3 +1,4 @@
+import { formatFecha } from "@/lib/fechas";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getUserFromToken } from "@/utils/getUserFromToken";
@@ -123,7 +124,7 @@ export default async function DashboardPage() {
                       #{cuota.numero}
                     </Link>
                   </TableCell>
-                  <TableCell>{cuota.fechaVencimiento.toLocaleDateString("es-AR")}</TableCell>
+                  <TableCell>{formatFecha(cuota.fechaVencimiento)}</TableCell>
                   <TableCell>{formatMonto(cuota.pendiente)}</TableCell>
                 </TableRow>
               ))}

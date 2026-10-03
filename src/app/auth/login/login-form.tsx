@@ -77,7 +77,8 @@ function ForgotPasswordDialog({
             <CheckCircle2 className="h-10 w-10 text-green-600" />
             <h3 className="text-lg font-semibold">¡Correo enviado!</h3>
             <p className="text-sm text-muted-foreground">
-              Te enviamos un enlace para restablecer tu contraseña. Revisá tu bandeja
+              Si el correo está registrado, te enviamos un enlace para restablecer tu
+              contraseña. Revisá tu bandeja
               de entrada.
             </p>
             <Button className="mt-2 w-full" onClick={() => handleOpenChange(false)}>

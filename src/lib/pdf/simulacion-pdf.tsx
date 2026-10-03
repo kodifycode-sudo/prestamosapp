@@ -1,3 +1,4 @@
+import { formatFecha, hoyCalendario } from "@/lib/fechas";
 import { Document, Page, Text, View, StyleSheet, renderToBuffer } from "@react-pdf/renderer";
 import { generarCuotas, type Frecuencia, type TipoInteres } from "@/lib/prestamos";
 import { formatMonto } from "@/lib/format";
@@ -32,10 +33,6 @@ const tipoInteresLabel: Record<TipoInteres, string> = {
   ALEMAN: "Alemán (capital fijo)",
   SIMPLE: "Interés simple",
 };
-
-function formatFecha(value: Date) {
-  return value.toLocaleDateString("es-AR");
-}
 
 export type SimulacionPdfData = {
   clienteNombre: string;
@@ -82,7 +79,7 @@ function SimulacionPdf({ simulacion }: { simulacion: SimulacionPdfData }) {
     <Document>
       <Page size="A4" style={styles.page}>
         <Text style={styles.title}>Simulación de préstamo</Text>
-        <Text style={styles.subtitle}>Gestión de Préstamos · Generado el {formatFecha(new Date())}</Text>
+        <Text style={styles.subtitle}>Gestión de Préstamos · Generado el {formatFecha(hoyCalendario())}</Text>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Cliente</Text>

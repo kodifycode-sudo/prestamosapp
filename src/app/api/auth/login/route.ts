@@ -1,23 +1,59 @@
 import prisma from "@/libs/prisma";
-import { comparePassword } from "@/utils/hash";
+import { comparePassword, hashPassword } from "@/utils/hash";
 import jwt from "jsonwebtoken";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import {
+  ipDelCliente,
+  limpiarIntentos,
+  minutosDeEspera,
+  registrarIntento,
+  superaLimite,
+} from "@/lib/limite-intentos";
 
 export const dynamic = "force-dynamic";
 
+const loginSchema = z.object({
+  email: z.string().trim().min(1),
+  password: z.string().min(1),
+});
+
+/** Mismo mensaje si el email no existe o la contraseña no coincide: no revela qué cuentas hay. */
+const CREDENCIALES_INVALIDAS = "Email o contraseña incorrectos";
+
+/**
+ * Hash bcrypt de referencia: cuando el email no existe igual se compara contra él,
+ * para que la respuesta tarde lo mismo y el tiempo tampoco delate qué cuentas existen.
+ */
+const hashReferencia = hashPassword(crypto.randomUUID());
+
 export async function POST(request: NextRequest) {
-  const { email, password } = await request.json();
+  const parsed = loginSchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Ingresá email y contraseña" }, { status: 400 });
+  }
+  const { email, password } = parsed.data;
+  const ip = ipDelCliente();
 
-  const user = await prisma.usuario.findUnique({ where: { email } });
-
-  if (!user) {
+  if (await superaLimite("LOGIN", email, ip)) {
     return NextResponse.json(
-      { error: "Usuario no encontrado" },
-      { status: 401 }
+      {
+        error: `Demasiados intentos fallidos. Esperá ${minutosDeEspera("LOGIN")} minutos e intentá de nuevo.`,
+      },
+      { status: 429 }
     );
   }
 
+  const user = await prisma.usuario.findUnique({ where: { email } });
+  const isValid = await comparePassword(password, user?.password ?? (await hashReferencia));
+
+  if (!user || !isValid) {
+    await registrarIntento("LOGIN", email, ip);
+    return NextResponse.json({ error: CREDENCIALES_INVALIDAS }, { status: 401 });
+  }
+
+  // Se informa solo después de validar la contraseña, para no revelar el estado de cuentas ajenas.
   if (!user.activo) {
     return NextResponse.json(
       { error: "Usuario inactivo. Comuníquese con el administrador." },
@@ -25,14 +61,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const isValid = await comparePassword(password, user.password);
-
-  if (!isValid) {
-    return NextResponse.json(
-      { error: "Contraseña incorrecta" },
-      { status: 401 }
-    );
-  }
+  await limpiarIntentos("LOGIN", email);
 
   if (!process.env.JWT_SECRET) {
     throw new Error("JWT_SECRET no está definido en las variables de entorno.");
@@ -53,6 +82,7 @@ export async function POST(request: NextRequest) {
   const cookieStore = await cookies();
   cookieStore.set("tokenPrestamos", token, {
     httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
   });

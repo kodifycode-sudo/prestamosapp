@@ -117,6 +117,18 @@ model PasswordResetToken {
   @@index([email])
 }
 
+/// Intentos de login fallidos y pedidos de recuperación de contraseña, para limitar
+/// la cantidad por email e IP en una ventana de tiempo (ver lib/limite-intentos).
+model IntentoAcceso {
+  id        String   @id @default(cuid())
+  tipo      String
+  clave     String
+  createdAt DateTime @default(now())
+
+  @@index([tipo, clave, createdAt])
+  @@index([createdAt])
+}
+
 model Cliente {
   id        String   @id @default(cuid())
   empresaId String

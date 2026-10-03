@@ -1,4 +1,4 @@
-import { differenceInCalendarDays, startOfDay } from "date-fns";
+import { diasEntre, filtroInstantesEntreDias, hoyCalendario, sumarDias } from "@/lib/fechas";
 import prisma from "@/libs/prisma";
 import type { TokenPayload } from "@/utils/getUserFromToken";
 import { scopeEmpresa as scopeUsuario } from "@/lib/scope";
@@ -204,17 +204,11 @@ export async function getReporteCobrosPorCobrador(
   desde?: string,
   hasta?: string
 ): Promise<ReporteCobrosPorCobrador> {
+  const rangoFechaPago = filtroInstantesEntreDias(desde, hasta);
   const pagos = await prisma.pago.findMany({
     where: {
       ...scopeUsuario(user),
-      ...(desde || hasta
-        ? {
-            fechaPago: {
-              ...(desde ? { gte: new Date(`${desde}T00:00:00`) } : {}),
-              ...(hasta ? { lte: new Date(`${hasta}T23:59:59`) } : {}),
-            },
-          }
-        : {}),
+      ...(rangoFechaPago ? { fechaPago: rangoFechaPago } : {}),
     },
     select: { usuarioId: true, monto: true, metodoPago: true },
   });
@@ -277,7 +271,7 @@ export type ReporteMorosidad = {
 };
 
 export async function getReporteMorosidad(user: TokenPayload): Promise<ReporteMorosidad> {
-  const hoy = startOfDay(new Date());
+  const hoy = hoyCalendario();
 
   const cuotas = await prisma.cuota.findMany({
     where: {
@@ -307,7 +301,7 @@ export async function getReporteMorosidad(user: TokenPayload): Promise<ReporteMo
   let totalAtrasado = 0;
 
   for (const cuota of cuotas) {
-    const diasAtraso = differenceInCalendarDays(hoy, cuota.fechaVencimiento);
+    const diasAtraso = diasEntre(cuota.fechaVencimiento, hoy);
     const montoAtrasado = Number(cuota.montoTotal) - Number(cuota.montoPagado);
     totalAtrasado += montoAtrasado;
 
@@ -360,9 +354,8 @@ export async function getReporteProximosVencimientos(
   user: TokenPayload,
   dias = 15
 ): Promise<ReporteProximosVencimientos> {
-  const hoy = startOfDay(new Date());
-  const limite = new Date(hoy);
-  limite.setDate(limite.getDate() + dias);
+  const hoy = hoyCalendario();
+  const limite = sumarDias(hoy, dias);
 
   const cuotas = await prisma.cuota.findMany({
     where: {

@@ -1,3 +1,4 @@
+import { formatFechaHora } from "@/lib/fechas";
 import { Document, Page, Text, View, StyleSheet, renderToBuffer } from "@react-pdf/renderer";
 
 const styles = StyleSheet.create({
@@ -52,7 +53,7 @@ function ReportePdf({ data }: { data: ReportePdfData }) {
       <Page size="A4" style={styles.page}>
         <Text style={styles.title}>{data.titulo}</Text>
         <Text style={styles.subtitle}>
-          Gestión de Préstamos · Generado el {new Date().toLocaleString("es-AR")}
+          Gestión de Préstamos · Generado el {formatFechaHora(new Date())}
           {data.subtitulo ? ` · ${data.subtitulo}` : ""}
         </Text>
 

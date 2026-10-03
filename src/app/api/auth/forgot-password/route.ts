@@ -1,15 +1,19 @@
 import crypto from "crypto";
 import prisma from "@/libs/prisma";
 import { NextRequest, NextResponse } from "next/server";
+import { ipDelCliente, minutosDeEspera, registrarIntento, superaLimite } from "@/lib/limite-intentos";
 
 export const dynamic = "force-dynamic";
 
-const SUCCESS_MESSAGE = "Te enviamos un enlace para restablecer tu contraseña.";
+/** Misma respuesta exista o no la cuenta, para no revelar qué correos están registrados. */
+const SUCCESS_MESSAGE =
+  "Si el correo está registrado, te enviamos un enlace para restablecer tu contraseña.";
 
 export async function POST(request: NextRequest) {
-  const { email } = await request.json();
+  const body = await request.json().catch(() => null);
+  const email = typeof body?.email === "string" ? body.email.trim() : "";
 
-  if (!email || typeof email !== "string") {
+  if (!email) {
     return NextResponse.json({ error: "El email es obligatorio" }, { status: 400 });
   }
 
@@ -18,13 +22,22 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "No se pudo enviar el correo" }, { status: 500 });
   }
 
+  const ip = ipDelCliente();
+  if (await superaLimite("RESET", email, ip)) {
+    return NextResponse.json(
+      {
+        error: `Ya se pidieron varios enlaces. Esperá ${minutosDeEspera("RESET")} minutos e intentá de nuevo.`,
+      },
+      { status: 429 }
+    );
+  }
+  // Cada pedido cuenta, exista o no la cuenta: evita usar el endpoint para mandar correos en masa.
+  await registrarIntento("RESET", email, ip);
+
   const usuario = await prisma.usuario.findUnique({ where: { email } });
 
   if (!usuario) {
-    return NextResponse.json(
-      { error: "No existe un usuario registrado con ese correo electrónico." },
-      { status: 404 }
-    );
+    return NextResponse.json({ message: SUCCESS_MESSAGE });
   }
 
   await prisma.passwordResetToken.updateMany({

@@ -1,4 +1,4 @@
-import { endOfDay, startOfDay } from "date-fns";
+import { filtroInstantesEntreDias } from "@/lib/fechas";
 import prisma from "@/libs/prisma";
 import type { TokenPayload } from "@/utils/getUserFromToken";
 import { toCountMap } from "@/lib/facets";
@@ -13,6 +13,7 @@ export type PagosFilters = {
 };
 
 export async function getPagosForUser(user: TokenPayload, filters: PagosFilters = {}) {
+  const rangoFechaPago = filtroInstantesEntreDias(filters.desde, filters.hasta);
   return prisma.pago.findMany({
     where: {
       ...scopeEmpresa(user),
@@ -20,14 +21,7 @@ export async function getPagosForUser(user: TokenPayload, filters: PagosFilters 
       ...(user.rol === "ADMIN" && filters.cobradorId?.length
         ? { usuarioId: { in: filters.cobradorId } }
         : {}),
-      ...(filters.desde || filters.hasta
-        ? {
-            fechaPago: {
-              ...(filters.desde ? { gte: startOfDay(new Date(`${filters.desde}T00:00:00`)) } : {}),
-              ...(filters.hasta ? { lte: endOfDay(new Date(`${filters.hasta}T00:00:00`)) } : {}),
-            },
-          }
-        : {}),
+      ...(rangoFechaPago ? { fechaPago: rangoFechaPago } : {}),
       ...(filters.q
         ? {
             prestamo: {

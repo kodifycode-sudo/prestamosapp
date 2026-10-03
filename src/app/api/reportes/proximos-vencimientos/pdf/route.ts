@@ -1,3 +1,4 @@
+import { formatFecha } from "@/lib/fechas";
 import { NextRequest, NextResponse } from "next/server";
 import { getUserFromToken } from "@/utils/getUserFromToken";
 import { getReporteProximosVencimientos } from "@/lib/reportes-queries";
@@ -25,7 +26,7 @@ export async function GET(request: NextRequest) {
           c.clienteNombre,
           c.cobrador,
           `#${c.numero}`,
-          c.fechaVencimiento.toLocaleDateString("es-AR"),
+          formatFecha(c.fechaVencimiento),
           formatMonto(c.monto),
         ]),
       },

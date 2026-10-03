@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { CUOTAS_MAXIMAS, MENSAJE_CUOTAS_MAXIMAS, MENSAJE_MONTO_MAXIMO, MONTO_MAXIMO } from "@/lib/limites";
 import prisma from "@/libs/prisma";
 import { getUserFromToken } from "@/utils/getUserFromToken";
 import { auditar } from "@/utils/auditoria";
@@ -9,11 +10,11 @@ import { getSaldoPendiente } from "@/lib/refinanciaciones-queries";
 export const dynamic = "force-dynamic";
 
 const refinanciarSchema = z.object({
-  interes: z.coerce.number().min(0, "El interés no puede ser negativo").transform(Math.round),
-  cantidadCuotas: z.coerce.number().int().min(1, "Debe haber al menos 1 cuota"),
+  interes: z.coerce.number().min(0, "El interés no puede ser negativo").max(MONTO_MAXIMO, MENSAJE_MONTO_MAXIMO).transform(Math.round),
+  cantidadCuotas: z.coerce.number().int().min(1, "Debe haber al menos 1 cuota").max(CUOTAS_MAXIMAS, MENSAJE_CUOTAS_MAXIMAS),
   frecuencia: z.enum(["DIARIA", "SEMANAL", "QUINCENAL", "MENSUAL"]),
   fechaInicio: z.coerce.date(),
-  montoAdicional: z.coerce.number().min(0, "No puede ser negativo").transform(Math.round).default(0),
+  montoAdicional: z.coerce.number().min(0, "No puede ser negativo").max(MONTO_MAXIMO, MENSAJE_MONTO_MAXIMO).transform(Math.round).default(0),
   observacion: z.string().optional(),
 });
 
@@ -67,6 +68,9 @@ export async function POST(
       }
 
       const montoNuevo = Math.round(saldoPendiente) + data.montoAdicional;
+      if (montoNuevo > MONTO_MAXIMO) {
+        throw new RefinanciacionRechazada(`El nuevo monto ${MENSAJE_MONTO_MAXIMO.toLowerCase()}`);
+      }
 
       const cuotasCalculadas = generarCuotas({
         monto: montoNuevo,

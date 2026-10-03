@@ -20,6 +20,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatMonto } from "@/lib/format";
 import { estadoCuotaVariant, getEstadoEfectivoCuota } from "@/lib/cuotas";
+import { claveFecha, hoyCalendario } from "@/lib/fechas";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -52,7 +53,7 @@ export function CalendarioCuotas({
 }) {
   const router = useRouter();
   const [diaSeleccionado, setDiaSeleccionado] = useState<string | null>(null);
-  const hoy = new Date();
+  const hoy = hoyCalendario();
   // mesDeReferencia llega como "yyyy-MM"; se parsea en hora local (no UTC) para que la
   // navegación de meses sea correcta en Vercel (server UTC) igual que en local.
   const mesActual = useMemo(() => {
@@ -71,7 +72,7 @@ export function CalendarioCuotas({
   const cuotasPorDia = useMemo(() => {
     const map = new Map<string, Cuota[]>();
     for (const cuota of cuotas) {
-      const key = format(new Date(cuota.fechaVencimiento), "yyyy-MM-dd");
+      const key = claveFecha(cuota.fechaVencimiento);
       const lista = map.get(key) ?? [];
       lista.push(cuota);
       map.set(key, lista);

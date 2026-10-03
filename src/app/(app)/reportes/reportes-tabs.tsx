@@ -1,5 +1,6 @@
 "use client";
 
+import { formatFecha } from "@/lib/fechas";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
@@ -576,7 +577,7 @@ export function ReportesTabs({
                       #{c.numero}
                     </Link>
                   </TableCell>
-                  <TableCell>{new Date(c.fechaVencimiento).toLocaleDateString("es-AR")}</TableCell>
+                  <TableCell>{formatFecha(c.fechaVencimiento)}</TableCell>
                   <TableCell>{formatMonto(c.monto)}</TableCell>
                 </TableRow>
               ))}

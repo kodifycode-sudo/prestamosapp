@@ -1,10 +1,11 @@
+import { formatFechaHora } from "@/lib/fechas";
 import type { Table } from "@tanstack/react-table";
 
 type ExportMeta = { label?: string; exportable?: boolean };
 
 function formatValueForExport(value: unknown): string | number {
   if (value === null || value === undefined) return "";
-  if (value instanceof Date) return value.toLocaleString("es-AR");
+  if (value instanceof Date) return formatFechaHora(value);
   if (typeof value === "boolean") return value ? "Sí" : "No";
   if (typeof value === "number" || typeof value === "string") return value;
   return String(value);
