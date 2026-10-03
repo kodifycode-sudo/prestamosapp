@@ -5,12 +5,13 @@ import { getUserFromToken } from "@/utils/getUserFromToken";
 import { auditCreate } from "@/utils/auditoria";
 import { hashPassword } from "@/utils/hash";
 import { passwordSchema } from "@/lib/password";
+import { emailSchema } from "@/lib/email";
 
 export const dynamic = "force-dynamic";
 
 const usuarioSchema = z.object({
   nombre: z.string().min(1, "El nombre es obligatorio"),
-  email: z.string().email("Email inválido"),
+  email: emailSchema,
   password: passwordSchema,
   rol: z.enum(["ADMIN", "COBRADOR"]),
 });

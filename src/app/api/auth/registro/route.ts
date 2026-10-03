@@ -5,6 +5,7 @@ import { hashPassword } from "@/utils/hash";
 import { auditar } from "@/utils/auditoria";
 import { passwordSchema } from "@/lib/password";
 import { escapeHtml } from "@/utils/html";
+import { emailSchema } from "@/lib/email";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +13,7 @@ const registroSchema = z
   .object({
     empresaNombre: z.string().min(1, "El nombre de la empresa es obligatorio"),
     nombre: z.string().min(1, "El nombre es obligatorio"),
-    email: z.string().email("Email inválido"),
+    email: emailSchema,
     password: passwordSchema,
     confirmPassword: z.string(),
   })

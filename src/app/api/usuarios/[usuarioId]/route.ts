@@ -5,12 +5,13 @@ import { getUserFromToken } from "@/utils/getUserFromToken";
 import { auditUpdate } from "@/utils/auditoria";
 import { hashPassword } from "@/utils/hash";
 import { passwordSchema } from "@/lib/password";
+import { emailSchema } from "@/lib/email";
 
 export const dynamic = "force-dynamic";
 
 const usuarioUpdateSchema = z.object({
   nombre: z.string().min(1).optional(),
-  email: z.string().email().optional(),
+  email: emailSchema.optional(),
   rol: z.enum(["ADMIN", "COBRADOR"]).optional(),
   activo: z.boolean().optional(),
   password: passwordSchema.optional(),
