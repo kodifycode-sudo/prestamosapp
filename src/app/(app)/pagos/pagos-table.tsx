@@ -24,6 +24,7 @@ import { DataTable } from "@/components/data-table/data-table";
 import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
 import { DataTableToolbarActions } from "@/components/data-table/data-table-toolbar-actions";
 import { DataTablePagination } from "@/components/data-table/data-table-pagination";
+import type { ResumenPagos } from "@/lib/pagos-queries";
 
 type Pago = {
   id: string;
@@ -110,9 +111,14 @@ export function PagosTable({
   facetCounts,
   isAdmin,
   initialFilters,
+  resumen,
+  limitePagina,
 }: {
   initialData: Pago[];
   facetCounts: FacetCounts;
+  /** Totales de todos los pagos del filtro, calculados en el servidor. */
+  resumen: ResumenPagos;
+  limitePagina: number;
   isAdmin: boolean;
   initialFilters: { metodo: string[]; cobrador: string[]; desde: string; hasta: string; q: string };
 }) {
@@ -185,17 +191,6 @@ export function PagosTable({
   }
 
   const data = useMemo(() => initialData, [initialData]);
-
-  const resumen = useMemo(() => {
-    const porMetodo: Record<string, number> = { EFECTIVO: 0, TRANSFERENCIA: 0, OTRO: 0 };
-    let total = 0;
-    for (const p of data) {
-      const monto = Number(p.monto);
-      total += monto;
-      porMetodo[p.metodoPago] = (porMetodo[p.metodoPago] ?? 0) + monto;
-    }
-    return { total, cantidad: data.length, porMetodo };
-  }, [data]);
 
   useEffect(() => {
     setPagination((p) => ({ ...p, pageIndex: 0 }));
@@ -283,6 +278,12 @@ export function PagosTable({
         table={table}
         emptyMessage={isPending ? "Buscando..." : "No hay pagos que coincidan con los filtros."}
       />
+      {resumen.cantidad > data.length && (
+        <p className="text-xs text-muted-foreground">
+          Se muestran los {limitePagina} pagos más recientes de {resumen.cantidad}. El cierre del día
+          y la exportación a Excel incluyen todos.
+        </p>
+      )}
       <DataTablePagination table={table} />
     </div>
   );

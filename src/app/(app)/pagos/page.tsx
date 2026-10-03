@@ -1,6 +1,12 @@
 import { redirect } from "next/navigation";
 import { getUserFromToken } from "@/utils/getUserFromToken";
-import { getPagosFacetCounts, getPagosForUser, parsePagosFilters } from "@/lib/pagos-queries";
+import {
+  getPagosFacetCounts,
+  getPagosForUser,
+  getResumenPagos,
+  PAGOS_POR_PAGINA,
+  parsePagosFilters,
+} from "@/lib/pagos-queries";
 import { PagosTable } from "./pagos-table";
 
 export default async function PagosPage(
@@ -15,6 +21,7 @@ export default async function PagosPage(
   const filters = parsePagosFilters(searchParams);
 
   const pagos = await getPagosForUser(user, filters);
+  const resumen = await getResumenPagos(user, filters);
   const facetCounts = await getPagosFacetCounts(user);
 
   return (
@@ -26,6 +33,8 @@ export default async function PagosPage(
       <PagosTable
         initialData={JSON.parse(JSON.stringify(pagos))}
         facetCounts={facetCounts}
+        resumen={resumen}
+        limitePagina={PAGOS_POR_PAGINA}
         isAdmin={user.rol === "ADMIN"}
         initialFilters={{
           metodo: filters.metodoPago ?? [],

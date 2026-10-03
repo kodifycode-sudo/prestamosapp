@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { filtroInstantesEntreDias } from "@/lib/fechas";
 import prisma from "@/libs/prisma";
 import type { TokenPayload } from "@/utils/getUserFromToken";
@@ -30,33 +31,38 @@ export function parsePagosFilters(params: ParametrosPagos): PagosFilters {
   };
 }
 
+/** Condición de los filtros de /pagos: la comparten la lista, la exportación y el cierre del día. */
+function wherePagos(user: TokenPayload, filters: PagosFilters): Prisma.PagoWhereInput {
+  const rangoFechaPago = filtroInstantesEntreDias(filters.desde, filters.hasta);
+  return {
+    ...scopeEmpresa(user),
+    ...(filters.metodoPago?.length ? { metodoPago: { in: filters.metodoPago as never[] } } : {}),
+    ...(user.rol === "ADMIN" && filters.cobradorId?.length
+      ? { usuarioId: { in: filters.cobradorId } }
+      : {}),
+    ...(rangoFechaPago ? { fechaPago: rangoFechaPago } : {}),
+    ...(filters.q
+      ? {
+          prestamo: {
+            cliente: {
+              OR: [
+                { nombre: { contains: filters.q, mode: "insensitive" as const } },
+                { apellido: { contains: filters.q, mode: "insensitive" as const } },
+              ],
+            },
+          },
+        }
+      : {}),
+  };
+}
+
 export async function getPagosForUser(
   user: TokenPayload,
   filters: PagosFilters = {},
   { limite = PAGOS_POR_PAGINA }: { limite?: number | null } = {}
 ) {
-  const rangoFechaPago = filtroInstantesEntreDias(filters.desde, filters.hasta);
   return prisma.pago.findMany({
-    where: {
-      ...scopeEmpresa(user),
-      ...(filters.metodoPago?.length ? { metodoPago: { in: filters.metodoPago as never[] } } : {}),
-      ...(user.rol === "ADMIN" && filters.cobradorId?.length
-        ? { usuarioId: { in: filters.cobradorId } }
-        : {}),
-      ...(rangoFechaPago ? { fechaPago: rangoFechaPago } : {}),
-      ...(filters.q
-        ? {
-            prestamo: {
-              cliente: {
-                OR: [
-                  { nombre: { contains: filters.q, mode: "insensitive" as const } },
-                  { apellido: { contains: filters.q, mode: "insensitive" as const } },
-                ],
-              },
-            },
-          }
-        : {}),
-    },
+    where: wherePagos(user, filters),
     include: {
       prestamo: { include: { cliente: { select: { id: true, nombre: true, apellido: true } } } },
       cuota: { select: { numero: true } },
@@ -64,6 +70,30 @@ export async function getPagosForUser(
     orderBy: { fechaPago: "desc" },
     ...(limite ? { take: limite } : {}),
   });
+}
+
+export type ResumenPagos = {
+  total: number;
+  cantidad: number;
+  porMetodo: Record<"EFECTIVO" | "TRANSFERENCIA" | "OTRO", number>;
+};
+
+/** Totales del cierre del día sobre todos los pagos del filtro (no solo los que muestra la página). */
+export async function getResumenPagos(user: TokenPayload, filters: PagosFilters = {}): Promise<ResumenPagos> {
+  const grupos = await prisma.pago.groupBy({
+    by: ["metodoPago"],
+    where: wherePagos(user, filters),
+    _sum: { monto: true },
+    _count: { _all: true },
+  });
+  const resumen: ResumenPagos = { total: 0, cantidad: 0, porMetodo: { EFECTIVO: 0, TRANSFERENCIA: 0, OTRO: 0 } };
+  for (const g of grupos) {
+    const monto = Number(g._sum.monto ?? 0);
+    resumen.total += monto;
+    resumen.cantidad += g._count._all;
+    resumen.porMetodo[g.metodoPago] = monto;
+  }
+  return resumen;
 }
 
 export async function getPagosFacetCounts(user: TokenPayload) {
