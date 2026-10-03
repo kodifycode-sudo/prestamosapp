@@ -99,11 +99,13 @@ export default async function PrestamoDetailPage(
               </Link>
             </Button>
           )}
-          <PrestamoActions
-            prestamoId={prestamo.id}
-            estado={prestamo.estado}
-            tienePagos={cuotas.some((c) => Number(c.montoPagado) > 0)}
-          />
+          {user.rol === "ADMIN" && (
+            <PrestamoActions
+              prestamoId={prestamo.id}
+              estado={prestamo.estado}
+              tienePagos={cuotas.some((c) => Number(c.montoPagado) > 0)}
+            />
+          )}
         </div>
       </div>
 

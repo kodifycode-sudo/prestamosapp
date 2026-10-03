@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import type { Prisma } from "@prisma/client";
 import prisma from "@/libs/prisma";
 import { getUserFromToken, type TokenPayload } from "@/utils/getUserFromToken";
 import { auditDelete, auditUpdate } from "@/utils/auditoria";
@@ -10,6 +11,18 @@ const prestamoUpdateSchema = z.object({
   // ATRASADO no se asigna a mano: se calcula según las cuotas vencidas (lib/estado-prestamo).
   estado: z.enum(["ACTIVO", "PAGADO", "CANCELADO"]),
 });
+
+/** Rechazo de negocio detectado dentro de la transacción; se traduce a una respuesta HTTP. */
+class OperacionRechazada extends Error {
+  constructor(message: string, public status = 409) {
+    super(message);
+  }
+}
+
+/** Bloquea el préstamo para que un cobro simultáneo no se cuele entre la validación y el cambio. */
+async function bloquearPrestamo(tx: Prisma.TransactionClient, prestamoId: string) {
+  await tx.$queryRaw`SELECT id FROM "Prestamo" WHERE id = ${prestamoId} FOR UPDATE`;
+}
 
 async function getPrestamoScoped(prestamoId: string, user: TokenPayload) {
   const prestamo = await prisma.prestamo.findUnique({ where: { id: prestamoId } });
@@ -42,74 +55,98 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ prest
   const params = await props.params;
   const user = await getUserFromToken();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  // Cambiar el estado a mano (cancelar, dar por pagado, reactivar) es decisión del administrador.
+  if (user.rol !== "ADMIN") return NextResponse.json({ error: "No autorizado" }, { status: 403 });
 
-  const { prestamo, forbidden } = await getPrestamoScoped(params.prestamoId, user);
-  if (forbidden) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  const { prestamo } = await getPrestamoScoped(params.prestamoId, user);
   if (!prestamo) return NextResponse.json({ error: "Préstamo no encontrado" }, { status: 404 });
-  // Su deuda ya pasó al préstamo nuevo: reactivarlo permitiría cobrarla dos veces.
-  if (prestamo.estado === "REFINANCIADO") {
-    return NextResponse.json(
-      { error: "No se puede cambiar el estado de un préstamo refinanciado" },
-      { status: 409 }
-    );
-  }
 
-  const body = await request.json();
+  const body = await request.json().catch(() => null);
   const parsed = prestamoUpdateSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
+  const { estado } = parsed.data;
 
-  const actualizado = await auditUpdate(
-    "Prestamo",
-    user.empresaId,
-    user.usuarioId,
-    prestamo.id,
-    (tx) => tx.prestamo.findUnique({ where: { id: prestamo.id } }),
-    (tx) => tx.prestamo.update({ where: { id: prestamo.id }, data: parsed.data })
-  );
-
-  return NextResponse.json(actualizado);
+  try {
+    const actualizado = await auditUpdate(
+      "Prestamo",
+      user.empresaId,
+      user.usuarioId,
+      prestamo.id,
+      async (tx) => {
+        await bloquearPrestamo(tx, prestamo.id);
+        return tx.prestamo.findUnique({ where: { id: prestamo.id } });
+      },
+      async (tx) => {
+        const actual = await tx.prestamo.findUniqueOrThrow({ where: { id: prestamo.id } });
+        // Su deuda ya pasó al préstamo nuevo: reactivarlo permitiría cobrarla dos veces.
+        if (actual.estado === "REFINANCIADO") {
+          throw new OperacionRechazada("No se puede cambiar el estado de un préstamo refinanciado");
+        }
+        if (estado === "CANCELADO" && (await tx.pago.count({ where: { prestamoId: prestamo.id } })) > 0) {
+          throw new OperacionRechazada("No se puede cancelar un préstamo con pagos registrados");
+        }
+        // PAGADO lo asigna el cobro de la última cuota; a mano solo se acepta si ya no queda deuda.
+        if (
+          estado === "PAGADO" &&
+          (await tx.cuota.count({ where: { prestamoId: prestamo.id, estado: { not: "PAGADA" } } })) > 0
+        ) {
+          throw new OperacionRechazada("No se puede marcar como pagado un préstamo con cuotas pendientes");
+        }
+        return tx.prestamo.update({ where: { id: prestamo.id }, data: { estado } });
+      }
+    );
+    return NextResponse.json(actualizado);
+  } catch (error) {
+    if (error instanceof OperacionRechazada) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    throw error;
+  }
 }
 
 export async function DELETE(request: NextRequest, props: { params: Promise<{ prestamoId: string }> }) {
   const params = await props.params;
   const user = await getUserFromToken();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  if (user.rol !== "ADMIN") return NextResponse.json({ error: "No autorizado" }, { status: 403 });
 
-  const { prestamo, forbidden } = await getPrestamoScoped(params.prestamoId, user);
-  if (forbidden) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  const { prestamo } = await getPrestamoScoped(params.prestamoId, user);
   if (!prestamo) return NextResponse.json({ error: "Préstamo no encontrado" }, { status: 404 });
 
-  const cantidadPagos = await prisma.pago.count({ where: { prestamoId: prestamo.id } });
-  if (cantidadPagos > 0) {
-    return NextResponse.json(
-      { error: "No se puede eliminar un préstamo con pagos registrados" },
-      { status: 409 }
+  try {
+    await auditDelete(
+      "Prestamo",
+      user.empresaId,
+      user.usuarioId,
+      prestamo.id,
+      async (tx) => {
+        await bloquearPrestamo(tx, prestamo.id);
+        return tx.prestamo.findUnique({ where: { id: prestamo.id } });
+      },
+      async (tx) => {
+        // Validado con el préstamo bloqueado: un pago no puede entrar entre el conteo y el borrado
+        // (no hay claves foráneas en la base que lo impidan).
+        if ((await tx.pago.count({ where: { prestamoId: prestamo.id } })) > 0) {
+          throw new OperacionRechazada("No se puede eliminar un préstamo con pagos registrados");
+        }
+        const tieneRefinanciacion = await tx.refinanciacion.findFirst({
+          where: { OR: [{ prestamoAnteriorId: prestamo.id }, { prestamoNuevoId: prestamo.id }] },
+        });
+        if (tieneRefinanciacion) {
+          throw new OperacionRechazada("No se puede eliminar un préstamo vinculado a una refinanciación");
+        }
+        await tx.cuota.deleteMany({ where: { prestamoId: prestamo.id } });
+        await tx.prestamo.delete({ where: { id: prestamo.id } });
+      }
     );
-  }
-
-  const tieneRefinanciacion = await prisma.refinanciacion.findFirst({
-    where: { OR: [{ prestamoAnteriorId: prestamo.id }, { prestamoNuevoId: prestamo.id }] },
-  });
-  if (tieneRefinanciacion) {
-    return NextResponse.json(
-      { error: "No se puede eliminar un préstamo vinculado a una refinanciación" },
-      { status: 409 }
-    );
-  }
-
-  await auditDelete(
-    "Prestamo",
-    user.empresaId,
-    user.usuarioId,
-    prestamo.id,
-    (tx) => tx.prestamo.findUnique({ where: { id: prestamo.id } }),
-    async (tx) => {
-      await tx.cuota.deleteMany({ where: { prestamoId: prestamo.id } });
-      await tx.prestamo.delete({ where: { id: prestamo.id } });
+  } catch (error) {
+    if (error instanceof OperacionRechazada) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
     }
-  );
+    throw error;
+  }
 
   return NextResponse.json({ success: true });
 }

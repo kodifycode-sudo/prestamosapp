@@ -4,6 +4,7 @@ import prisma from "@/libs/prisma";
 import { getUserFromToken, type TokenPayload } from "@/utils/getUserFromToken";
 import { auditDelete, auditUpdate } from "@/utils/auditoria";
 import { esUsuarioDeLaEmpresa } from "@/lib/clientes";
+import { esDuplicado } from "@/lib/errores";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,9 @@ const clienteUpdateSchema = z.object({
   email: z.string().email().optional().or(z.literal("")),
   usuarioId: z.string().optional(),
 });
+
+/** Rechazo de negocio detectado dentro de la transacción. */
+class ClienteConPrestamos extends Error {}
 
 async function getClienteScoped(clienteId: string, user: TokenPayload) {
   const cliente = await prisma.cliente.findUnique({ where: { id: clienteId } });
@@ -53,7 +57,7 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ clien
   if (forbidden) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   if (!cliente) return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
 
-  const body = await request.json();
+  const body = await request.json().catch(() => null);
   const parsed = clienteUpdateSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
@@ -69,14 +73,32 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ clien
     ...(user.rol === "ADMIN" && usuarioId ? { usuarioId } : {}),
   };
 
-  const actualizado = await auditUpdate(
-    "Cliente",
-    user.empresaId,
-    user.usuarioId,
-    cliente.id,
-    (tx) => tx.cliente.findUnique({ where: { id: cliente.id } }),
-    (tx) => tx.cliente.update({ where: { id: cliente.id }, data })
-  );
+  const cambiaCobrador = data.usuarioId !== undefined && data.usuarioId !== cliente.usuarioId;
+
+  let actualizado;
+  try {
+    actualizado = await auditUpdate(
+      "Cliente",
+      user.empresaId,
+      user.usuarioId,
+      cliente.id,
+      (tx) => tx.cliente.findUnique({ where: { id: cliente.id } }),
+      async (tx) => {
+        const guardado = await tx.cliente.update({ where: { id: cliente.id }, data });
+        // Los préstamos siguen al cliente: el nuevo cobrador es quien los ve y los cobra.
+        // Los pagos ya registrados conservan a quien los cobró.
+        if (cambiaCobrador) {
+          await tx.prestamo.updateMany({ where: { clienteId: cliente.id }, data: { usuarioId: guardado.usuarioId } });
+        }
+        return guardado;
+      }
+    );
+  } catch (error) {
+    if (esDuplicado(error)) {
+      return NextResponse.json({ error: "Ya existe un cliente con ese documento" }, { status: 409 });
+    }
+    throw error;
+  }
 
   return NextResponse.json(actualizado);
 }
@@ -90,24 +112,34 @@ export async function DELETE(request: NextRequest, props: { params: Promise<{ cl
   if (forbidden) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   if (!cliente) return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
 
-  const cantidadPrestamos = await prisma.prestamo.count({
-    where: { clienteId: cliente.id },
-  });
-  if (cantidadPrestamos > 0) {
-    return NextResponse.json(
-      { error: "No se puede eliminar un cliente con préstamos asociados" },
-      { status: 409 }
+  try {
+    await auditDelete(
+      "Cliente",
+      user.empresaId,
+      user.usuarioId,
+      cliente.id,
+      async (tx) => {
+        // Bloqueo el cliente: el alta de préstamos también lo bloquea, así no se
+        // le crea un préstamo entre el conteo y el borrado (no hay claves foráneas en la base).
+        await tx.$queryRaw`SELECT id FROM "Cliente" WHERE id = ${cliente.id} FOR UPDATE`;
+        return tx.cliente.findUnique({ where: { id: cliente.id } });
+      },
+      async (tx) => {
+        if ((await tx.prestamo.count({ where: { clienteId: cliente.id } })) > 0) {
+          throw new ClienteConPrestamos();
+        }
+        await tx.cliente.delete({ where: { id: cliente.id } });
+      }
     );
+  } catch (error) {
+    if (error instanceof ClienteConPrestamos) {
+      return NextResponse.json(
+        { error: "No se puede eliminar un cliente con préstamos asociados" },
+        { status: 409 }
+      );
+    }
+    throw error;
   }
-
-  await auditDelete(
-    "Cliente",
-    user.empresaId,
-    user.usuarioId,
-    cliente.id,
-    (tx) => tx.cliente.findUnique({ where: { id: cliente.id } }),
-    (tx) => tx.cliente.delete({ where: { id: cliente.id } })
-  );
 
   return NextResponse.json({ success: true });
 }

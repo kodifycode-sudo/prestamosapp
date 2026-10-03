@@ -3,6 +3,8 @@ import prisma from "@/libs/prisma";
 import { NextRequest, NextResponse } from "next/server";
 import { ipDelCliente, minutosDeEspera, registrarIntento, superaLimite } from "@/lib/limite-intentos";
 import { escapeHtml } from "@/utils/html";
+import { normalizarEmail } from "@/lib/email";
+import { hashTokenReset } from "@/lib/token-reset";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +14,7 @@ const SUCCESS_MESSAGE =
 
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
-  const email = typeof body?.email === "string" ? body.email.trim() : "";
+  const email = typeof body?.email === "string" ? normalizarEmail(body.email) : "";
 
   if (!email) {
     return NextResponse.json({ error: "El email es obligatorio" }, { status: 400 });
@@ -50,7 +52,7 @@ export async function POST(request: NextRequest) {
   const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
 
   await prisma.passwordResetToken.create({
-    data: { token, email, expiresAt },
+    data: { token: hashTokenReset(token), email, expiresAt },
   });
 
   const resetUrl = `${process.env.NEXT_PUBLIC_APP_URL}/auth/reset-password?token=${token}`;

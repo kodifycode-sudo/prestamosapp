@@ -15,7 +15,7 @@ const refinanciarSchema = z.object({
   frecuencia: z.enum(["DIARIA", "SEMANAL", "QUINCENAL", "MENSUAL"]),
   fechaInicio: z.coerce.date(),
   montoAdicional: z.coerce.number().min(0, "No puede ser negativo").max(MONTO_MAXIMO, MENSAJE_MONTO_MAXIMO).transform(Math.round).default(0),
-  observacion: z.string().optional(),
+  observacion: z.string().max(500, "La observación admite hasta 500 caracteres").optional(),
 });
 
 /** Rechazo de negocio detectado dentro de la transacción. */
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ pres
     );
   }
 
-  const body = await request.json();
+  const body = await request.json().catch(() => null);
   const parsed = refinanciarSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });

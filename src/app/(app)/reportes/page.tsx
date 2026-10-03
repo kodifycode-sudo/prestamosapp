@@ -20,17 +20,21 @@ export default async function ReportesPage(
   const user = await getUserFromToken();
   if (!user) redirect("/auth/salir");
 
-  const cartera = await getReporteCartera(user);
-  const categorias = await getReporteCategorias(user);
-  const cobrosPorCobrador = await getReporteCobrosPorCobrador(user, searchParams.desde, searchParams.hasta);
-  const morosidad = await getReporteMorosidad(user);
-  const proximosVencimientos = await getReporteProximosVencimientos(user, 15);
-  const prestamosDetalle = await getPrestamosForUser(user);
-  const fuentesIngreso = await prisma.fuenteIngreso.findMany({
-    where: { empresaId: user.empresaId },
-    select: { id: true, nombre: true },
-    orderBy: { nombre: "asc" },
-  });
+  // Consultas independientes entre sí: se lanzan en paralelo.
+  const [cartera, categorias, cobrosPorCobrador, morosidad, proximosVencimientos, prestamosDetalle, fuentesIngreso] =
+    await Promise.all([
+      getReporteCartera(user),
+      getReporteCategorias(user),
+      getReporteCobrosPorCobrador(user, searchParams.desde, searchParams.hasta),
+      getReporteMorosidad(user),
+      getReporteProximosVencimientos(user, 15),
+      getPrestamosForUser(user),
+      prisma.fuenteIngreso.findMany({
+        where: { empresaId: user.empresaId },
+        select: { id: true, nombre: true },
+        orderBy: { nombre: "asc" },
+      }),
+    ]);
 
   return (
     <div className="space-y-6">

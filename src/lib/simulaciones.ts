@@ -1,6 +1,7 @@
 import prisma from "@/libs/prisma";
 import type { TokenPayload } from "@/utils/getUserFromToken";
-import { toCountMap } from "@/lib/facets";
+import { Frecuencia, TipoInteres } from "@prisma/client";
+import { toCountMap, valoresDeEnum } from "@/lib/facets";
 import { scopeEmpresa } from "@/lib/scope";
 
 export type SimulacionesFilters = {
@@ -10,11 +11,13 @@ export type SimulacionesFilters = {
 };
 
 export async function getSimulacionesForUser(user: TokenPayload, filters: SimulacionesFilters = {}) {
+  const tipos = valoresDeEnum(filters.tipoInteres, TipoInteres);
+  const frecuencias = valoresDeEnum(filters.frecuencia, Frecuencia);
   return prisma.simulacion.findMany({
     where: {
       ...scopeEmpresa(user),
-      ...(filters.tipoInteres?.length ? { tipoInteres: { in: filters.tipoInteres as never[] } } : {}),
-      ...(filters.frecuencia?.length ? { frecuencia: { in: filters.frecuencia as never[] } } : {}),
+      ...(tipos.length ? { tipoInteres: { in: tipos } } : {}),
+      ...(frecuencias.length ? { frecuencia: { in: frecuencias } } : {}),
       ...(filters.q ? { clienteNombre: { contains: filters.q, mode: "insensitive" as const } } : {}),
     },
     orderBy: { createdAt: "desc" },

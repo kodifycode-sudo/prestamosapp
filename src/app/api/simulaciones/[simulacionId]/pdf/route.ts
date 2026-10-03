@@ -31,12 +31,18 @@ export async function GET(request: NextRequest, props: { params: Promise<{ simul
     fechaInicio: simulacion.fechaInicio,
   });
 
-  const nombreArchivo = `simulacion-${simulacion.clienteNombre.replace(/\s+/g, "-").toLowerCase()}.pdf`;
+  const nombreArchivo = `simulacion-${simulacion.clienteNombre.trim().replace(/\s+/g, "-").toLowerCase()}.pdf`;
+  // `filename` solo admite ASCII (sin comillas); el nombre completo, con tildes o
+  // cualquier otro carácter, va codificado en `filename*`.
+  const nombreAscii = nombreArchivo
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .replace(/[^\w.-]/g, "_");
 
   return new NextResponse(new Uint8Array(buffer), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="${nombreArchivo}"`,
+      "Content-Disposition": `attachment; filename="${nombreAscii}"; filename*=UTF-8''${encodeURIComponent(nombreArchivo)}`,
     },
   });
 }

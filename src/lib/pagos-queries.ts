@@ -1,8 +1,8 @@
-import type { Prisma } from "@prisma/client";
+import { MetodoPago, type Prisma } from "@prisma/client";
 import { filtroInstantesEntreDias } from "@/lib/fechas";
 import prisma from "@/libs/prisma";
 import type { TokenPayload } from "@/utils/getUserFromToken";
-import { toCountMap } from "@/lib/facets";
+import { toCountMap, valoresDeEnum } from "@/lib/facets";
 import { scopeEmpresa } from "@/lib/scope";
 
 export type PagosFilters = {
@@ -34,9 +34,10 @@ export function parsePagosFilters(params: ParametrosPagos): PagosFilters {
 /** Condición de los filtros de /pagos: la comparten la lista, la exportación y el cierre del día. */
 function wherePagos(user: TokenPayload, filters: PagosFilters): Prisma.PagoWhereInput {
   const rangoFechaPago = filtroInstantesEntreDias(filters.desde, filters.hasta);
+  const metodos = valoresDeEnum(filters.metodoPago, MetodoPago);
   return {
     ...scopeEmpresa(user),
-    ...(filters.metodoPago?.length ? { metodoPago: { in: filters.metodoPago as never[] } } : {}),
+    ...(metodos.length ? { metodoPago: { in: metodos } } : {}),
     ...(user.rol === "ADMIN" && filters.cobradorId?.length
       ? { usuarioId: { in: filters.cobradorId } }
       : {}),

@@ -5,8 +5,11 @@ import { getUserFromToken } from "@/utils/getUserFromToken";
 import { esUsuarioDeLaEmpresa } from "@/lib/clientes";
 import { auditCreate } from "@/utils/auditoria";
 import { scopeEmpresa } from "@/lib/scope";
+import { esDuplicado } from "@/lib/errores";
 
 export const dynamic = "force-dynamic";
+
+const DOCUMENTO_EN_USO = "Ya existe un cliente con ese documento";
 
 const clienteSchema = z.object({
   nombre: z.string().min(1, "El nombre es obligatorio"),
@@ -48,7 +51,7 @@ export async function POST(request: NextRequest) {
   const user = await getUserFromToken();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
-  const body = await request.json();
+  const body = await request.json().catch(() => null);
   const parsed = clienteSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
@@ -61,7 +64,7 @@ export async function POST(request: NextRequest) {
   });
   if (existente) {
     return NextResponse.json(
-      { error: "Ya existe un cliente con ese documento" },
+      { error: DOCUMENTO_EN_USO },
       { status: 409 }
     );
   }
@@ -71,11 +74,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Cobrador no encontrado" }, { status: 400 });
   }
 
-  const nuevo = await auditCreate("Cliente", user.empresaId, user.usuarioId, (tx) =>
-    tx.cliente.create({
-      data: { ...rest, empresaId: user.empresaId, email: email || undefined, usuarioId: asignadoA },
-    })
-  );
+  let nuevo;
+  try {
+    nuevo = await auditCreate("Cliente", user.empresaId, user.usuarioId, (tx) =>
+      tx.cliente.create({
+        data: { ...rest, empresaId: user.empresaId, email: email || undefined, usuarioId: asignadoA },
+      })
+    );
+  } catch (error) {
+    if (esDuplicado(error)) return NextResponse.json({ error: DOCUMENTO_EN_USO }, { status: 409 });
+    throw error;
+  }
 
   return NextResponse.json(nuevo, { status: 201 });
 }

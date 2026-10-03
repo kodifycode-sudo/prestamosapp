@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { CUOTAS_MAXIMAS, MENSAJE_CUOTAS_MAXIMAS, MENSAJE_MONTO_MAXIMO, MONTO_MAXIMO } from "@/lib/limites";
+import { EstadoPrestamo } from "@prisma/client";
 import prisma from "@/libs/prisma";
 import { getUserFromToken } from "@/utils/getUserFromToken";
 import { auditCreate } from "@/utils/auditoria";
 import { generarCuotas } from "@/lib/prestamos";
 import { scopeEmpresa } from "@/lib/scope";
 import { leerPaginacion } from "@/lib/paginacion";
+import { valoresDeEnum } from "@/lib/facets";
 
 export const dynamic = "force-dynamic";
 
@@ -20,18 +22,21 @@ const prestamoSchema = z.object({
   fechaInicio: z.coerce.date(),
 });
 
+/** El cliente se eliminó mientras se creaba el préstamo. */
+class ClienteEliminado extends Error {}
+
 export async function GET(request: NextRequest) {
   const user = await getUserFromToken();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   const clienteId = request.nextUrl.searchParams.get("clienteId") ?? undefined;
-  const estado = request.nextUrl.searchParams.get("estado") ?? undefined;
+  const [estado] = valoresDeEnum([request.nextUrl.searchParams.get("estado") ?? ""], EstadoPrestamo);
 
   const pagina = leerPaginacion(request.nextUrl.searchParams);
   const where = {
     ...scopeEmpresa(user),
     ...(clienteId ? { clienteId } : {}),
-    ...(estado ? { estado: estado as never } : {}),
+    ...(estado ? { estado } : {}),
   };
 
   const prestamos = await prisma.prestamo.findMany({
@@ -53,7 +58,7 @@ export async function POST(request: NextRequest) {
   const user = await getUserFromToken();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
-  const body = await request.json();
+  const body = await request.json().catch(() => null);
   const parsed = prestamoSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
@@ -84,39 +89,50 @@ export async function POST(request: NextRequest) {
     fechaInicio: data.fechaInicio,
   });
 
-  const prestamo = await auditCreate("Prestamo", user.empresaId, user.usuarioId, async (tx) => {
-    const nuevo = await tx.prestamo.create({
-      data: {
-        empresaId: user.empresaId,
-        clienteId: data.clienteId,
-        usuarioId: cliente.usuarioId,
-        fuenteIngresoId: data.fuenteIngresoId,
-        monto: data.monto,
-        interes: data.interes,
-        cantidadCuotas: data.cantidadCuotas,
-        frecuencia: data.frecuencia,
-        fechaInicio: data.fechaInicio,
-      },
-    });
+  let prestamo;
+  try {
+    prestamo = await auditCreate("Prestamo", user.empresaId, user.usuarioId, async (tx) => {
+      // Bloqueo el cliente para que no se elimine mientras se le crea el préstamo.
+      const bloqueado = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM "Cliente" WHERE id = ${cliente.id} FOR UPDATE`;
+      if (bloqueado.length === 0) throw new ClienteEliminado();
+      const nuevo = await tx.prestamo.create({
+        data: {
+          empresaId: user.empresaId,
+          clienteId: data.clienteId,
+          usuarioId: cliente.usuarioId,
+          fuenteIngresoId: data.fuenteIngresoId,
+          monto: data.monto,
+          interes: data.interes,
+          cantidadCuotas: data.cantidadCuotas,
+          frecuencia: data.frecuencia,
+          fechaInicio: data.fechaInicio,
+        },
+      });
 
-    await tx.cuota.createMany({
-      data: cuotasCalculadas.map((cuota) => ({
-        prestamoId: nuevo.id,
-        numero: cuota.numero,
-        fechaVencimiento: cuota.fechaVencimiento,
-        montoCapital: cuota.montoCapital,
-        montoInteres: cuota.montoInteres,
-        montoTotal: cuota.montoTotal,
-      })),
-    });
+      await tx.cuota.createMany({
+        data: cuotasCalculadas.map((cuota) => ({
+          prestamoId: nuevo.id,
+          numero: cuota.numero,
+          fechaVencimiento: cuota.fechaVencimiento,
+          montoCapital: cuota.montoCapital,
+          montoInteres: cuota.montoInteres,
+          montoTotal: cuota.montoTotal,
+        })),
+      });
 
-    const cuotas = await tx.cuota.findMany({
-      where: { prestamoId: nuevo.id },
-      orderBy: { numero: "asc" },
-    });
+      const cuotas = await tx.cuota.findMany({
+        where: { prestamoId: nuevo.id },
+        orderBy: { numero: "asc" },
+      });
 
-    return { ...nuevo, cuotas };
-  });
+      return { ...nuevo, cuotas };
+    });
+  } catch (error) {
+    if (error instanceof ClienteEliminado) {
+      return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
+    }
+    throw error;
+  }
 
   return NextResponse.json(prestamo, { status: 201 });
 }

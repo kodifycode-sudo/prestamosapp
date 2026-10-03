@@ -5,12 +5,14 @@ import { getUserFromToken } from "@/utils/getUserFromToken";
 import { auditUpdate } from "@/utils/auditoria";
 import { hashPassword } from "@/utils/hash";
 import { passwordSchema } from "@/lib/password";
+import { emailSchema } from "@/lib/email";
+import { esDuplicado } from "@/lib/errores";
 
 export const dynamic = "force-dynamic";
 
 const usuarioUpdateSchema = z.object({
   nombre: z.string().min(1).optional(),
-  email: z.string().email().optional(),
+  email: emailSchema.optional(),
   rol: z.enum(["ADMIN", "COBRADOR"]).optional(),
   activo: z.boolean().optional(),
   password: passwordSchema.optional(),
@@ -27,7 +29,7 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ usuar
     return NextResponse.json({ error: "Usuario no encontrado" }, { status: 404 });
   }
 
-  const body = await request.json();
+  const body = await request.json().catch(() => null);
   const parsed = usuarioUpdateSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
@@ -42,23 +44,35 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ usuar
 
   const { password, ...rest } = parsed.data;
 
-  const actualizado = await auditUpdate(
-    "Usuario",
-    user.empresaId,
-    user.usuarioId,
-    existente.id,
-    async (tx) => {
-      const anterior = await tx.usuario.findUnique({ where: { id: existente.id } });
-      return anterior ? { ...anterior, password: "***" } : null;
-    },
-    async (tx) => {
-      const guardado = await tx.usuario.update({
-        where: { id: existente.id },
-        data: { ...rest, ...(password ? { password: await hashPassword(password) } : {}) },
-      });
-      return { ...guardado, password: "***" };
+  let actualizado;
+  try {
+    actualizado = await auditUpdate(
+      "Usuario",
+      user.empresaId,
+      user.usuarioId,
+      existente.id,
+      async (tx) => {
+        const anterior = await tx.usuario.findUnique({ where: { id: existente.id } });
+        return anterior ? { ...anterior, password: "***" } : null;
+      },
+      async (tx) => {
+        const guardado = await tx.usuario.update({
+          where: { id: existente.id },
+          data: {
+            ...rest,
+            // Una contraseña nueva cierra las sesiones abiertas con la anterior.
+            ...(password ? { password: await hashPassword(password), sesionVersion: { increment: 1 } } : {}),
+          },
+        });
+        return { ...guardado, password: "***" };
+      }
+    );
+  } catch (error) {
+    if (esDuplicado(error)) {
+      return NextResponse.json({ error: "Ya existe un usuario con ese email" }, { status: 409 });
     }
-  );
+    throw error;
+  }
 
   return NextResponse.json(actualizado);
 }

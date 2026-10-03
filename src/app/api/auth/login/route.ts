@@ -11,11 +11,12 @@ import {
   registrarIntento,
   superaLimite,
 } from "@/lib/limite-intentos";
+import { normalizarEmail } from "@/lib/email";
 
 export const dynamic = "force-dynamic";
 
 const loginSchema = z.object({
-  email: z.string().trim().min(1),
+  email: z.string().trim().min(1).transform(normalizarEmail),
   password: z.string().min(1),
 });
 
@@ -75,6 +76,7 @@ export async function POST(request: NextRequest) {
       email: user.email,
       nombre: user.nombre,
       rol: user.rol,
+      sv: user.sesionVersion,
     },
     process.env.JWT_SECRET
   );
