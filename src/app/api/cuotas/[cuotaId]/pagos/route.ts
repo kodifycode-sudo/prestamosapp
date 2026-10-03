@@ -11,8 +11,8 @@ export const dynamic = "force-dynamic";
 const pagoSchema = z.object({
   monto: z.coerce.number().positive("El monto debe ser mayor a 0").transform(Math.round),
   metodoPago: z.enum(["EFECTIVO", "TRANSFERENCIA", "OTRO"]).default("EFECTIVO"),
-  observacion: z.string().optional(),
-  idempotencyKey: z.string().optional(),
+  observacion: z.string().max(500, "La observación admite hasta 500 caracteres").optional(),
+  idempotencyKey: z.string().max(100).optional(),
 });
 
 /**

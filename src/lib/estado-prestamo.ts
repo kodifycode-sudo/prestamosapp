@@ -1,4 +1,5 @@
-import type { Prisma } from "@prisma/client";
+import { EstadoPrestamo, type Prisma } from "@prisma/client";
+import { valoresDeEnum } from "@/lib/facets";
 import { hoyCalendario } from "@/lib/fechas";
 
 /**
@@ -27,13 +28,14 @@ export function estadoEfectivoPrestamo(
 export function whereEstadoEfectivo(estados: string[], hoy: Date = hoyCalendario()): Prisma.PrestamoWhereInput {
   const condiciones: Prisma.PrestamoWhereInput[] = [];
   // ATRASADO también incluye préstamos que hayan quedado guardados así antes de este cambio.
-  const guardados = estados.filter((e) => e !== "ACTIVO");
-  if (guardados.length) condiciones.push({ estado: { in: guardados as never[] } });
+  const guardados = valoresDeEnum(estados, EstadoPrestamo).filter((e) => e !== "ACTIVO");
+  if (guardados.length) condiciones.push({ estado: { in: guardados } });
   if (estados.includes("ATRASADO")) {
     condiciones.push({ estado: "ACTIVO", cuotas: { some: cuotaVencidaImpaga(hoy) } });
   }
   if (estados.includes("ACTIVO")) {
     condiciones.push({ estado: "ACTIVO", cuotas: { none: cuotaVencidaImpaga(hoy) } });
   }
-  return { OR: condiciones };
+  // Ningún estado válido en el filtro: no se filtra.
+  return condiciones.length ? { OR: condiciones } : {};
 }

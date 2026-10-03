@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { CUOTAS_MAXIMAS, MENSAJE_CUOTAS_MAXIMAS, MENSAJE_MONTO_MAXIMO, MONTO_MAXIMO } from "@/lib/limites";
+import { EstadoPrestamo } from "@prisma/client";
 import prisma from "@/libs/prisma";
 import { getUserFromToken } from "@/utils/getUserFromToken";
 import { auditCreate } from "@/utils/auditoria";
 import { generarCuotas } from "@/lib/prestamos";
 import { scopeEmpresa } from "@/lib/scope";
 import { leerPaginacion } from "@/lib/paginacion";
+import { valoresDeEnum } from "@/lib/facets";
 
 export const dynamic = "force-dynamic";
 
@@ -28,13 +30,13 @@ export async function GET(request: NextRequest) {
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   const clienteId = request.nextUrl.searchParams.get("clienteId") ?? undefined;
-  const estado = request.nextUrl.searchParams.get("estado") ?? undefined;
+  const [estado] = valoresDeEnum([request.nextUrl.searchParams.get("estado") ?? ""], EstadoPrestamo);
 
   const pagina = leerPaginacion(request.nextUrl.searchParams);
   const where = {
     ...scopeEmpresa(user),
     ...(clienteId ? { clienteId } : {}),
-    ...(estado ? { estado: estado as never } : {}),
+    ...(estado ? { estado } : {}),
   };
 
   const prestamos = await prisma.prestamo.findMany({

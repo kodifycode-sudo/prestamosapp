@@ -1,6 +1,7 @@
 import prisma from "@/libs/prisma";
 import type { TokenPayload } from "@/utils/getUserFromToken";
-import { toCountMap } from "@/lib/facets";
+import { Frecuencia, TipoInteres } from "@prisma/client";
+import { toCountMap, valoresDeEnum } from "@/lib/facets";
 import { scopeEmpresa } from "@/lib/scope";
 import { hoyCalendario } from "@/lib/fechas";
 import { cuotaVencidaImpaga, estadoEfectivoPrestamo, whereEstadoEfectivo } from "@/lib/estado-prestamo";
@@ -15,12 +16,14 @@ export type PrestamosFilters = {
 
 export async function getPrestamosForUser(user: TokenPayload, filters: PrestamosFilters = {}) {
   const hoy = hoyCalendario();
+  const tipos = valoresDeEnum(filters.tipoInteres, TipoInteres);
+  const frecuencias = valoresDeEnum(filters.frecuencia, Frecuencia);
   const prestamos = await prisma.prestamo.findMany({
     where: {
       ...scopeEmpresa(user),
       ...(filters.estado?.length ? whereEstadoEfectivo(filters.estado, hoy) : {}),
-      ...(filters.tipoInteres?.length ? { tipoInteres: { in: filters.tipoInteres as never[] } } : {}),
-      ...(filters.frecuencia?.length ? { frecuencia: { in: filters.frecuencia as never[] } } : {}),
+      ...(tipos.length ? { tipoInteres: { in: tipos } } : {}),
+      ...(frecuencias.length ? { frecuencia: { in: frecuencias } } : {}),
       ...(filters.clienteId ? { clienteId: filters.clienteId } : {}),
       ...(filters.q
         ? {
