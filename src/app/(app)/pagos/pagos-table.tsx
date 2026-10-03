@@ -130,6 +130,14 @@ export function PagosTable({
       }
     : undefined;
 
+  // La tabla muestra los pagos más recientes; el Excel incluye todos los que
+  // cumplen los filtros actuales de la URL.
+  async function obtenerTodosLosPagos(): Promise<Pago[]> {
+    const res = await fetch(`/api/pagos/exportar${window.location.search}`);
+    if (!res.ok) throw new Error("No se pudieron obtener los pagos");
+    return res.json();
+  }
+
   function updateParams(mutate: (params: URLSearchParams) => void) {
     const params = new URLSearchParams(window.location.search);
     mutate(params);
@@ -240,7 +248,7 @@ export function PagosTable({
             </Button>
           )}
         </div>
-        <DataTableToolbarActions table={table} filename="pagos" />
+        <DataTableToolbarActions table={table} filename="pagos" obtenerTodos={obtenerTodosLosPagos} />
       </div>
 
       <div className="rounded-md border bg-muted/30 p-4">

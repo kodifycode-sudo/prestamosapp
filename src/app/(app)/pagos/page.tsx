@@ -1,11 +1,7 @@
 import { redirect } from "next/navigation";
 import { getUserFromToken } from "@/utils/getUserFromToken";
-import { getPagosFacetCounts, getPagosForUser } from "@/lib/pagos-queries";
+import { getPagosFacetCounts, getPagosForUser, parsePagosFilters } from "@/lib/pagos-queries";
 import { PagosTable } from "./pagos-table";
-
-function parseList(value?: string) {
-  return value ? value.split(",").filter(Boolean) : [];
-}
 
 export default async function PagosPage(
   props: {
@@ -16,13 +12,7 @@ export default async function PagosPage(
   const user = await getUserFromToken();
   if (!user) redirect("/auth/salir");
 
-  const filters = {
-    metodoPago: parseList(searchParams.metodo),
-    cobradorId: parseList(searchParams.cobrador),
-    desde: searchParams.desde,
-    hasta: searchParams.hasta,
-    q: searchParams.q,
-  };
+  const filters = parsePagosFilters(searchParams);
 
   const pagos = await getPagosForUser(user, filters);
   const facetCounts = await getPagosFacetCounts(user);
@@ -38,8 +28,8 @@ export default async function PagosPage(
         facetCounts={facetCounts}
         isAdmin={user.rol === "ADMIN"}
         initialFilters={{
-          metodo: filters.metodoPago,
-          cobrador: filters.cobradorId,
+          metodo: filters.metodoPago ?? [],
+          cobrador: filters.cobradorId ?? [],
           desde: filters.desde ?? "",
           hasta: filters.hasta ?? "",
           q: searchParams.q ?? "",

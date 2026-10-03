@@ -15,16 +15,19 @@ import { exportTableToExcel } from "@/lib/export-excel";
 export function DataTableExportButton<TData>({
   table,
   filename,
+  obtenerTodos,
 }: {
   table: Table<TData>;
   filename: string;
+  /** Trae todas las filas a exportar cuando la tabla muestra solo una parte. */
+  obtenerTodos?: () => Promise<TData[]>;
 }) {
   const [loading, setLoading] = useState(false);
 
   async function handleExport() {
     setLoading(true);
     try {
-      await exportTableToExcel(table, filename);
+      await exportTableToExcel(table, filename, obtenerTodos ? await obtenerTodos() : undefined);
     } catch {
       toast.error("No se pudo exportar a Excel");
     } finally {

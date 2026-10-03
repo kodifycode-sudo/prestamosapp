@@ -7,14 +7,16 @@ import { DataTableExportButton } from "@/components/data-table/data-table-export
 export function DataTableToolbarActions<TData>({
   table,
   filename,
+  obtenerTodos,
 }: {
   table: Table<TData>;
   filename: string;
+  obtenerTodos?: () => Promise<TData[]>;
 }) {
   return (
     <div className="flex items-center gap-2">
       <DataTableViewOptions table={table} />
-      <DataTableExportButton table={table} filename={filename} />
+      <DataTableExportButton table={table} filename={filename} obtenerTodos={obtenerTodos} />
     </div>
   );
 }

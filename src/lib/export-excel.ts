@@ -1,5 +1,5 @@
 import { formatFechaHora } from "@/lib/fechas";
-import type { Table } from "@tanstack/react-table";
+import { createTable, type Table } from "@tanstack/react-table";
 
 type ExportMeta = { label?: string; exportable?: boolean };
 
@@ -11,10 +11,32 @@ function formatValueForExport(value: unknown): string | number {
   return String(value);
 }
 
-export async function exportTableToExcel<TData>(table: Table<TData>, filename: string) {
-  const XLSX = await import("xlsx");
+/**
+ * Misma tabla (columnas, visibilidad y orden elegidos) pero con otro conjunto de
+ * filas: se usa cuando la pantalla muestra solo una parte y se exporta todo.
+ */
+function tablaConDatos<TData>(table: Table<TData>, data: TData[]): Table<TData> {
+  return createTable<TData>({
+    ...table.options,
+    data,
+    state: table.getState(),
+    onStateChange: () => {},
+  });
+}
 
-  const columns = table
+/**
+ * Exporta las filas de la tabla a un .xlsx. Si se pasa `todasLasFilas`, se exportan
+ * esas en lugar de las cargadas en pantalla.
+ */
+export async function exportTableToExcel<TData>(
+  table: Table<TData>,
+  filename: string,
+  todasLasFilas?: TData[]
+) {
+  const XLSX = await import("xlsx");
+  const origen = todasLasFilas ? tablaConDatos(table, todasLasFilas) : table;
+
+  const columns = origen
     .getVisibleFlatColumns()
     .filter((column) => (column.columnDef.meta as ExportMeta | undefined)?.exportable !== false);
 
@@ -22,7 +44,7 @@ export async function exportTableToExcel<TData>(table: Table<TData>, filename: s
     (column) => (column.columnDef.meta as ExportMeta | undefined)?.label ?? column.id
   );
 
-  const rows = table
+  const rows = origen
     .getSortedRowModel()
     .rows.map((row) => columns.map((column) => formatValueForExport(row.getValue(column.id))));
 

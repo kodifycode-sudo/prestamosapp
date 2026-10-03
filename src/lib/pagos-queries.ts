@@ -12,7 +12,29 @@ export type PagosFilters = {
   q?: string;
 };
 
-export async function getPagosForUser(user: TokenPayload, filters: PagosFilters = {}) {
+/** Cantidad de pagos que muestra la página; la exportación a Excel no tiene tope. */
+export const PAGOS_POR_PAGINA = 200;
+
+type ParametrosPagos = { metodo?: string | null; cobrador?: string | null; desde?: string | null; hasta?: string | null; q?: string | null };
+
+const parseList = (value?: string | null) => (value ? value.split(",").filter(Boolean) : []);
+
+/** Filtros de la URL de /pagos (?metodo=&cobrador=&desde=&hasta=&q=). La página y la exportación usan la misma lectura. */
+export function parsePagosFilters(params: ParametrosPagos): PagosFilters {
+  return {
+    metodoPago: parseList(params.metodo),
+    cobradorId: parseList(params.cobrador),
+    desde: params.desde ?? undefined,
+    hasta: params.hasta ?? undefined,
+    q: params.q ?? undefined,
+  };
+}
+
+export async function getPagosForUser(
+  user: TokenPayload,
+  filters: PagosFilters = {},
+  { limite = PAGOS_POR_PAGINA }: { limite?: number | null } = {}
+) {
   const rangoFechaPago = filtroInstantesEntreDias(filters.desde, filters.hasta);
   return prisma.pago.findMany({
     where: {
@@ -40,7 +62,7 @@ export async function getPagosForUser(user: TokenPayload, filters: PagosFilters 
       cuota: { select: { numero: true } },
     },
     orderBy: { fechaPago: "desc" },
-    take: 200,
+    ...(limite ? { take: limite } : {}),
   });
 }
 
