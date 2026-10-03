@@ -14,7 +14,7 @@ const empresaUpdateSchema = z.object({
 });
 
 export async function GET() {
-  const user = getUserFromToken();
+  const user = await getUserFromToken();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   const empresa = await prisma.empresa.findUnique({ where: { id: user.empresaId } });
@@ -24,7 +24,7 @@ export async function GET() {
 }
 
 export async function PUT(request: NextRequest) {
-  const user = getUserFromToken();
+  const user = await getUserFromToken();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   if (user.rol !== "ADMIN") return NextResponse.json({ error: "No autorizado" }, { status: 403 });
 

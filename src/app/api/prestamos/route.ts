@@ -19,7 +19,7 @@ const prestamoSchema = z.object({
 });
 
 export async function GET(request: NextRequest) {
-  const user = getUserFromToken();
+  const user = await getUserFromToken();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   const clienteId = request.nextUrl.searchParams.get("clienteId") ?? undefined;
@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const user = getUserFromToken();
+  const user = await getUserFromToken();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   const body = await request.json();

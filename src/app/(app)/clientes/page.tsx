@@ -8,8 +8,8 @@ export default async function ClientesPage({
 }: {
   searchParams: { q?: string };
 }) {
-  const user = getUserFromToken();
-  if (!user) redirect("/auth/login");
+  const user = await getUserFromToken();
+  if (!user) redirect("/auth/salir");
 
   const clientes = await getClientesForUser(user, searchParams.q);
 

@@ -7,7 +7,7 @@ import { formatMonto } from "@/lib/format";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const user = getUserFromToken();
+  const user = await getUserFromToken();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   const reporte = await getReporteMorosidad(user);

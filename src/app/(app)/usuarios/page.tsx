@@ -4,8 +4,8 @@ import prisma from "@/libs/prisma";
 import { UsuariosTable } from "./usuarios-table";
 
 export default async function UsuariosPage() {
-  const user = getUserFromToken();
-  if (!user) redirect("/auth/login");
+  const user = await getUserFromToken();
+  if (!user) redirect("/auth/salir");
   if (user.rol !== "ADMIN") redirect("/dashboard");
 
   const usuarios = await prisma.usuario.findMany({

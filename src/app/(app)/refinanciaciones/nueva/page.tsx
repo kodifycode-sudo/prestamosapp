@@ -8,8 +8,8 @@ export default async function NuevaRefinanciacionPage({
 }: {
   searchParams: { prestamoId?: string };
 }) {
-  const user = getUserFromToken();
-  if (!user) redirect("/auth/login");
+  const user = await getUserFromToken();
+  if (!user) redirect("/auth/salir");
 
   const prestamos = await getPrestamosRefinanciables(user);
 

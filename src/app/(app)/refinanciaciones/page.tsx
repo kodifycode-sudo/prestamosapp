@@ -8,8 +8,8 @@ export default async function RefinanciacionesPage({
 }: {
   searchParams: { q?: string };
 }) {
-  const user = getUserFromToken();
-  if (!user) redirect("/auth/login");
+  const user = await getUserFromToken();
+  if (!user) redirect("/auth/salir");
 
   const refinanciaciones = await getRefinanciacionesForUser(user, searchParams.q);
 

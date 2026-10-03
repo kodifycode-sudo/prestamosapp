@@ -4,8 +4,8 @@ import prisma from "@/libs/prisma";
 import { FuentesTable } from "./fuentes-table";
 
 export default async function FuentesIngresoPage() {
-  const user = getUserFromToken();
-  if (!user) redirect("/auth/login");
+  const user = await getUserFromToken();
+  if (!user) redirect("/auth/salir");
   if (user.rol !== "ADMIN") redirect("/dashboard");
 
   const fuentes = await prisma.fuenteIngreso.findMany({

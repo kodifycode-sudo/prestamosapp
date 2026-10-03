@@ -16,8 +16,8 @@ export default async function ReportesPage({
 }: {
   searchParams: { desde?: string; hasta?: string; tab?: string };
 }) {
-  const user = getUserFromToken();
-  if (!user) redirect("/auth/login");
+  const user = await getUserFromToken();
+  if (!user) redirect("/auth/salir");
 
   const cartera = await getReporteCartera(user);
   const categorias = await getReporteCategorias(user);

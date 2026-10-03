@@ -12,8 +12,8 @@ export default async function PrestamosPage({
 }: {
   searchParams: { estado?: string; tipo?: string; frecuencia?: string; q?: string };
 }) {
-  const user = getUserFromToken();
-  if (!user) redirect("/auth/login");
+  const user = await getUserFromToken();
+  if (!user) redirect("/auth/salir");
 
   const filters = {
     estado: parseList(searchParams.estado),

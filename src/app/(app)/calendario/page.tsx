@@ -17,8 +17,8 @@ export default async function CalendarioPage({
 }: {
   searchParams: { mes?: string };
 }) {
-  const user = getUserFromToken();
-  if (!user) redirect("/auth/login");
+  const user = await getUserFromToken();
+  if (!user) redirect("/auth/salir");
 
   const mesDeReferencia = parseMes(searchParams.mes);
   const cuotas = await getCuotasDelMes(user, mesDeReferencia);

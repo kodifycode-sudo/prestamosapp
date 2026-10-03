@@ -2,9 +2,9 @@ import { redirect } from "next/navigation";
 import { getUserFromToken } from "@/utils/getUserFromToken";
 import { SimulacionForm } from "../simulacion-form";
 
-export default function NuevaSimulacionPage() {
-  const user = getUserFromToken();
-  if (!user) redirect("/auth/login");
+export default async function NuevaSimulacionPage() {
+  const user = await getUserFromToken();
+  if (!user) redirect("/auth/salir");
 
   return (
     <div className="space-y-6">

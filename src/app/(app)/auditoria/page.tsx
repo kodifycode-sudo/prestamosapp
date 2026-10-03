@@ -12,8 +12,8 @@ export default async function AuditoriaPage({
 }: {
   searchParams: { tabla?: string; accion?: string; q?: string };
 }) {
-  const user = getUserFromToken();
-  if (!user) redirect("/auth/login");
+  const user = await getUserFromToken();
+  if (!user) redirect("/auth/salir");
   if (user.rol !== "ADMIN") redirect("/dashboard");
 
   const filters = {

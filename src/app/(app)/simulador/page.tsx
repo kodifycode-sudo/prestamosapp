@@ -12,8 +12,8 @@ export default async function SimuladorPage({
 }: {
   searchParams: { tipo?: string; frecuencia?: string; q?: string };
 }) {
-  const user = getUserFromToken();
-  if (!user) redirect("/auth/login");
+  const user = await getUserFromToken();
+  if (!user) redirect("/auth/salir");
 
   const filters = {
     tipoInteres: parseList(searchParams.tipo),

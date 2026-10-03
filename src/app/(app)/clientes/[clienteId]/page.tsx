@@ -27,8 +27,8 @@ export default async function ClienteDetailPage({
 }: {
   params: { clienteId: string };
 }) {
-  const user = getUserFromToken();
-  if (!user) redirect("/auth/login");
+  const user = await getUserFromToken();
+  if (!user) redirect("/auth/salir");
 
   const cliente = await prisma.cliente.findUnique({
     where: { id: params.clienteId },

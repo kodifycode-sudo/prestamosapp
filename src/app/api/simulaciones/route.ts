@@ -18,7 +18,7 @@ const simulacionSchema = z.object({
 });
 
 export async function GET() {
-  const user = getUserFromToken();
+  const user = await getUserFromToken();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   const simulaciones = await prisma.simulacion.findMany({
@@ -30,7 +30,7 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const user = getUserFromToken();
+  const user = await getUserFromToken();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   const body = await request.json();

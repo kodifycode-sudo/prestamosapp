@@ -4,8 +4,8 @@ import prisma from "@/libs/prisma";
 import { EmpresaForm } from "./empresa-form";
 
 export default async function EmpresaPage() {
-  const user = getUserFromToken();
-  if (!user) redirect("/auth/login");
+  const user = await getUserFromToken();
+  if (!user) redirect("/auth/salir");
   if (user.rol !== "ADMIN") redirect("/dashboard");
 
   const empresa = await prisma.empresa.findUnique({ where: { id: user.empresaId } });

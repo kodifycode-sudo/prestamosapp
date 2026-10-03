@@ -29,7 +29,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { clienteId: string } }
 ) {
-  const user = getUserFromToken();
+  const user = await getUserFromToken();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   const { cliente, forbidden } = await getClienteScoped(params.clienteId, user);
@@ -49,7 +49,7 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: { clienteId: string } }
 ) {
-  const user = getUserFromToken();
+  const user = await getUserFromToken();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   const { cliente, forbidden } = await getClienteScoped(params.clienteId, user);
@@ -85,7 +85,7 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: { clienteId: string } }
 ) {
-  const user = getUserFromToken();
+  const user = await getUserFromToken();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   const { cliente, forbidden } = await getClienteScoped(params.clienteId, user);

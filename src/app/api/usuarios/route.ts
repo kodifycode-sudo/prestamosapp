@@ -15,7 +15,7 @@ const usuarioSchema = z.object({
 });
 
 export async function GET() {
-  const user = getUserFromToken();
+  const user = await getUserFromToken();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   if (user.rol !== "ADMIN") return NextResponse.json({ error: "No autorizado" }, { status: 403 });
 
@@ -29,7 +29,7 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const user = getUserFromToken();
+  const user = await getUserFromToken();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   if (user.rol !== "ADMIN") return NextResponse.json({ error: "No autorizado" }, { status: 403 });
 

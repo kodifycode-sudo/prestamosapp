@@ -12,8 +12,8 @@ export default async function PagosPage({
 }: {
   searchParams: { metodo?: string; cobrador?: string; desde?: string; hasta?: string; q?: string };
 }) {
-  const user = getUserFromToken();
-  if (!user) redirect("/auth/login");
+  const user = await getUserFromToken();
+  if (!user) redirect("/auth/salir");
 
   const filters = {
     metodoPago: parseList(searchParams.metodo),

@@ -31,8 +31,8 @@ export default async function PrestamoDetailPage({
 }: {
   params: { prestamoId: string };
 }) {
-  const user = getUserFromToken();
-  if (!user) redirect("/auth/login");
+  const user = await getUserFromToken();
+  if (!user) redirect("/auth/salir");
 
   const prestamo = await prisma.prestamo.findUnique({
     where: { id: params.prestamoId },

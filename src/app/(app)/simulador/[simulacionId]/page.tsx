@@ -18,8 +18,8 @@ export default async function SimulacionDetailPage({
 }: {
   params: { simulacionId: string };
 }) {
-  const user = getUserFromToken();
-  if (!user) redirect("/auth/login");
+  const user = await getUserFromToken();
+  if (!user) redirect("/auth/salir");
 
   const simulacion = await prisma.simulacion.findUnique({ where: { id: params.simulacionId } });
   if (!simulacion || simulacion.empresaId !== user.empresaId) notFound();

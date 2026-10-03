@@ -16,8 +16,8 @@ import {
 import { CobrosChart } from "./cobros-chart";
 
 export default async function DashboardPage() {
-  const user = getUserFromToken();
-  if (!user) redirect("/auth/login");
+  const user = await getUserFromToken();
+  if (!user) redirect("/auth/salir");
 
   const stats = await getDashboardStats(user);
 

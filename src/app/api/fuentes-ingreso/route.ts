@@ -12,7 +12,7 @@ const fuenteIngresoSchema = z.object({
 });
 
 export async function GET() {
-  const user = getUserFromToken();
+  const user = await getUserFromToken();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   const fuentes = await prisma.fuenteIngreso.findMany({
@@ -24,7 +24,7 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const user = getUserFromToken();
+  const user = await getUserFromToken();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   if (user.rol !== "ADMIN") return NextResponse.json({ error: "No autorizado" }, { status: 403 });
 

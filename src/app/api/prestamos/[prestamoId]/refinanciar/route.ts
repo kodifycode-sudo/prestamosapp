@@ -17,11 +17,14 @@ const refinanciarSchema = z.object({
   observacion: z.string().optional(),
 });
 
+/** Rechazo de negocio detectado dentro de la transacción. */
+class RefinanciacionRechazada extends Error {}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: { prestamoId: string } }
 ) {
-  const user = getUserFromToken();
+  const user = await getUserFromToken();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   const prestamoAnterior = await prisma.prestamo.findUnique({ where: { id: params.prestamoId } });
@@ -44,70 +47,85 @@ export async function POST(
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const saldoPendiente = await getSaldoPendiente(prestamoAnterior.id);
-  if (saldoPendiente <= 0) {
-    return NextResponse.json(
-      { error: "Este préstamo no tiene saldo pendiente para refinanciar" },
-      { status: 409 }
-    );
-  }
-
   const data = parsed.data;
-  const montoNuevo = Math.round(saldoPendiente) + data.montoAdicional;
 
-  const cuotasCalculadas = generarCuotas({
-    monto: montoNuevo,
-    interes: data.interes,
-    cantidadCuotas: data.cantidadCuotas,
-    frecuencia: data.frecuencia,
-    fechaInicio: data.fechaInicio,
-  });
+  let resultado;
+  try {
+    resultado = await prisma.$transaction(async (tx) => {
+      // Bloqueo el préstamo y revalido estado y saldo con los valores vigentes:
+      // así dos refinanciaciones simultáneas (o un pago en curso) no pueden
+      // generar dos préstamos nuevos ni partir de un saldo desactualizado.
+      await tx.$queryRaw`SELECT id FROM "Prestamo" WHERE id = ${prestamoAnterior.id} FOR UPDATE`;
+      const actual = await tx.prestamo.findUniqueOrThrow({ where: { id: prestamoAnterior.id } });
+      if (actual.estado !== "ACTIVO") {
+        throw new RefinanciacionRechazada("Solo se puede refinanciar un préstamo activo");
+      }
 
-  const resultado = await prisma.$transaction(async (tx) => {
-    const prestamoNuevo = await tx.prestamo.create({
-      data: {
-        empresaId: user.empresaId,
-        clienteId: prestamoAnterior.clienteId,
-        usuarioId: prestamoAnterior.usuarioId,
-        fuenteIngresoId: prestamoAnterior.fuenteIngresoId,
+      const saldoPendiente = await getSaldoPendiente(prestamoAnterior.id, tx);
+      if (saldoPendiente <= 0) {
+        throw new RefinanciacionRechazada("Este préstamo no tiene saldo pendiente para refinanciar");
+      }
+
+      const montoNuevo = Math.round(saldoPendiente) + data.montoAdicional;
+
+      const cuotasCalculadas = generarCuotas({
         monto: montoNuevo,
         interes: data.interes,
         cantidadCuotas: data.cantidadCuotas,
         frecuencia: data.frecuencia,
         fechaInicio: data.fechaInicio,
-      },
-    });
+      });
 
-    await tx.cuota.createMany({
-      data: cuotasCalculadas.map((cuota) => ({
-        prestamoId: prestamoNuevo.id,
-        numero: cuota.numero,
-        fechaVencimiento: cuota.fechaVencimiento,
-        montoCapital: cuota.montoCapital,
-        montoInteres: cuota.montoInteres,
-        montoTotal: cuota.montoTotal,
-      })),
-    });
+      const prestamoNuevo = await tx.prestamo.create({
+        data: {
+          empresaId: user.empresaId,
+          clienteId: prestamoAnterior.clienteId,
+          usuarioId: prestamoAnterior.usuarioId,
+          fuenteIngresoId: prestamoAnterior.fuenteIngresoId,
+          monto: montoNuevo,
+          interes: data.interes,
+          cantidadCuotas: data.cantidadCuotas,
+          frecuencia: data.frecuencia,
+          fechaInicio: data.fechaInicio,
+        },
+      });
 
-    await tx.prestamo.update({
-      where: { id: prestamoAnterior.id },
-      data: { estado: "REFINANCIADO" },
-    });
+      await tx.cuota.createMany({
+        data: cuotasCalculadas.map((cuota) => ({
+          prestamoId: prestamoNuevo.id,
+          numero: cuota.numero,
+          fechaVencimiento: cuota.fechaVencimiento,
+          montoCapital: cuota.montoCapital,
+          montoInteres: cuota.montoInteres,
+          montoTotal: cuota.montoTotal,
+        })),
+      });
 
-    const refinanciacion = await tx.refinanciacion.create({
-      data: {
-        empresaId: user.empresaId,
-        prestamoAnteriorId: prestamoAnterior.id,
-        prestamoNuevoId: prestamoNuevo.id,
-        usuarioId: user.usuarioId,
-        saldoAnterior: saldoPendiente,
-        montoAdicional: data.montoAdicional,
-        observacion: data.observacion,
-      },
-    });
+      await tx.prestamo.update({
+        where: { id: prestamoAnterior.id },
+        data: { estado: "REFINANCIADO" },
+      });
 
-    return { prestamoNuevo, refinanciacion };
-  });
+      const refinanciacion = await tx.refinanciacion.create({
+        data: {
+          empresaId: user.empresaId,
+          prestamoAnteriorId: prestamoAnterior.id,
+          prestamoNuevoId: prestamoNuevo.id,
+          usuarioId: user.usuarioId,
+          saldoAnterior: saldoPendiente,
+          montoAdicional: data.montoAdicional,
+          observacion: data.observacion,
+        },
+      });
+
+      return { prestamoNuevo, refinanciacion };
+    }, { maxWait: 10_000, timeout: 20_000 });
+  } catch (error) {
+    if (error instanceof RefinanciacionRechazada) {
+      return NextResponse.json({ error: error.message }, { status: 409 });
+    }
+    throw error;
+  }
 
   await auditar("Refinanciacion", "CREATE", user.empresaId, user.usuarioId, {
     registroId: resultado.refinanciacion.id,

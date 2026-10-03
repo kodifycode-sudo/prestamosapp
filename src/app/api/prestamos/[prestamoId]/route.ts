@@ -23,7 +23,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { prestamoId: string } }
 ) {
-  const user = getUserFromToken();
+  const user = await getUserFromToken();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   const { prestamo, forbidden } = await getPrestamoScoped(params.prestamoId, user);
@@ -43,12 +43,19 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: { prestamoId: string } }
 ) {
-  const user = getUserFromToken();
+  const user = await getUserFromToken();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   const { prestamo, forbidden } = await getPrestamoScoped(params.prestamoId, user);
   if (forbidden) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   if (!prestamo) return NextResponse.json({ error: "Préstamo no encontrado" }, { status: 404 });
+  // Su deuda ya pasó al préstamo nuevo: reactivarlo permitiría cobrarla dos veces.
+  if (prestamo.estado === "REFINANCIADO") {
+    return NextResponse.json(
+      { error: "No se puede cambiar el estado de un préstamo refinanciado" },
+      { status: 409 }
+    );
+  }
 
   const body = await request.json();
   const parsed = prestamoUpdateSchema.safeParse(body);
@@ -72,7 +79,7 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: { prestamoId: string } }
 ) {
-  const user = getUserFromToken();
+  const user = await getUserFromToken();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   const { prestamo, forbidden } = await getPrestamoScoped(params.prestamoId, user);

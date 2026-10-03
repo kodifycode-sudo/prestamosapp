@@ -2,9 +2,9 @@ import { redirect } from "next/navigation";
 import { getUserFromToken } from "@/utils/getUserFromToken";
 import { NuevoUsuarioForm } from "./nuevo-usuario-form";
 
-export default function NuevoUsuarioPage() {
-  const user = getUserFromToken();
-  if (!user) redirect("/auth/login");
+export default async function NuevoUsuarioPage() {
+  const user = await getUserFromToken();
+  if (!user) redirect("/auth/salir");
   if (user.rol !== "ADMIN") redirect("/dashboard");
 
   return (

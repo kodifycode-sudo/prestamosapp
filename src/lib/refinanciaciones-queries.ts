@@ -1,9 +1,11 @@
+import type { Prisma } from "@prisma/client";
 import prisma from "@/libs/prisma";
 import type { TokenPayload } from "@/utils/getUserFromToken";
 import { scopeEmpresa } from "@/lib/scope";
 
-export async function getSaldoPendiente(prestamoId: string) {
-  const cuotas = await prisma.cuota.findMany({
+/** `db` permite calcularlo dentro de una transacción en curso. */
+export async function getSaldoPendiente(prestamoId: string, db: Prisma.TransactionClient = prisma) {
+  const cuotas = await db.cuota.findMany({
     where: { prestamoId, estado: { not: "PAGADA" } },
     select: { montoTotal: true, montoPagado: true },
   });

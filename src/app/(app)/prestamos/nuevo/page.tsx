@@ -9,8 +9,8 @@ export default async function NuevoPrestamoPage({
 }: {
   searchParams: { clienteId?: string };
 }) {
-  const user = getUserFromToken();
-  if (!user) redirect("/auth/login");
+  const user = await getUserFromToken();
+  if (!user) redirect("/auth/salir");
 
   const clientes = await getClientesForUser(user);
   const fuentesIngreso = await prisma.fuenteIngreso.findMany({

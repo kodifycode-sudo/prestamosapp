@@ -9,7 +9,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { simulacionId: string } }
 ) {
-  const user = getUserFromToken();
+  const user = await getUserFromToken();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   const simulacion = await prisma.simulacion.findUnique({ where: { id: params.simulacionId } });
