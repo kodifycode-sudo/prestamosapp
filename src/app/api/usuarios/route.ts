@@ -4,13 +4,14 @@ import prisma from "@/libs/prisma";
 import { getUserFromToken } from "@/utils/getUserFromToken";
 import { auditCreate } from "@/utils/auditoria";
 import { hashPassword } from "@/utils/hash";
+import { passwordSchema } from "@/lib/password";
 
 export const dynamic = "force-dynamic";
 
 const usuarioSchema = z.object({
   nombre: z.string().min(1, "El nombre es obligatorio"),
   email: z.string().email("Email inválido"),
-  password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
+  password: passwordSchema,
   rol: z.enum(["ADMIN", "COBRADOR"]),
 });
 
@@ -44,8 +45,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Ya existe un usuario con ese email" }, { status: 409 });
   }
 
-  const nuevo = await auditCreate("Usuario", user.empresaId, user.usuarioId, async () => {
-    const creado = await prisma.usuario.create({
+  const nuevo = await auditCreate("Usuario", user.empresaId, user.usuarioId, async (tx) => {
+    const creado = await tx.usuario.create({
       data: {
         empresaId: user.empresaId,
         nombre: parsed.data.nombre,

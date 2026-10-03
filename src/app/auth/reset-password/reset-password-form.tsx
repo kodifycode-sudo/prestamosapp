@@ -10,10 +10,11 @@ import { CheckCircle2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
+import { passwordSchema } from "@/lib/password";
 
 const resetSchema = z
   .object({
-    password: z.string().min(6, "Mínimo 6 caracteres"),
+    password: passwordSchema,
     confirmPassword: z.string().min(1, "Confirmá tu contraseña"),
   })
   .refine((data) => data.password === data.confirmPassword, {

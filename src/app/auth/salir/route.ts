@@ -1,14 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getUserFromToken } from "@/utils/getUserFromToken";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Cierra la sesión del lado del servidor y lleva al login. Las páginas protegidas
- * redirigen acá cuando el token ya no corresponde a un usuario activo: si fueran
- * directo a /auth/login, el middleware vería la cookie todavía válida y las
- * devolvería al dashboard en un bucle.
+ * Cierra una sesión que ya no es válida (usuario desactivado o token vencido) y
+ * lleva al login. Las páginas protegidas redirigen acá en ese caso. Si la sesión
+ * sigue siendo válida no se toca: así un enlace externo a esta ruta no puede
+ * cerrarle la sesión a nadie (para salir a propósito está POST /api/auth/logout).
  */
-export function GET(request: NextRequest) {
+export async function GET(request: NextRequest) {
+  if (await getUserFromToken()) {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
   const response = NextResponse.redirect(new URL("/auth/login", request.url));
   response.cookies.delete("tokenPrestamos");
   return response;

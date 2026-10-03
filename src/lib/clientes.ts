@@ -20,3 +20,9 @@ export async function getClientesForUser(user: TokenPayload, q?: string) {
     orderBy: { createdAt: "desc" },
   });
 }
+
+/** El cobrador asignado a un cliente tiene que ser un usuario de la misma empresa. */
+export async function esUsuarioDeLaEmpresa(usuarioId: string, empresaId: string) {
+  const usuario = await prisma.usuario.findUnique({ where: { id: usuarioId }, select: { empresaId: true } });
+  return usuario?.empresaId === empresaId;
+}

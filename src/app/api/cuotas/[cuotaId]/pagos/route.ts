@@ -64,79 +64,77 @@ export async function POST(
   }
 
   try {
-    const pago = await auditCreate("Pago", user.empresaId, user.usuarioId, () =>
-      prisma.$transaction(async (tx) => {
-        // Bloqueo préstamo y cuota (siempre en ese orden, igual que la refinanciación)
-        // para que dos cobros simultáneos no se pisen y el saldo se valide con el
-        // valor vigente, no con el leído antes de la transacción.
-        await tx.$queryRaw`SELECT id FROM "Prestamo" WHERE id = ${prestamo.id} FOR UPDATE`;
-        await tx.$queryRaw`SELECT id FROM "Cuota" WHERE id = ${cuota.id} FOR UPDATE`;
+    const pago = await auditCreate("Pago", user.empresaId, user.usuarioId, async (tx) => {
+      // Bloqueo préstamo y cuota (siempre en ese orden, igual que la refinanciación)
+      // para que dos cobros simultáneos no se pisen y el saldo se valide con el
+      // valor vigente, no con el leído antes de la transacción.
+      await tx.$queryRaw`SELECT id FROM "Prestamo" WHERE id = ${prestamo.id} FOR UPDATE`;
+      await tx.$queryRaw`SELECT id FROM "Cuota" WHERE id = ${cuota.id} FOR UPDATE`;
 
-        const prestamoActual = await tx.prestamo.findUniqueOrThrow({ where: { id: prestamo.id } });
-        const cuotaActual = await tx.cuota.findUniqueOrThrow({ where: { id: cuota.id } });
+      const prestamoActual = await tx.prestamo.findUniqueOrThrow({ where: { id: prestamo.id } });
+      const cuotaActual = await tx.cuota.findUniqueOrThrow({ where: { id: cuota.id } });
 
-        if (prestamoActual.estado === "CANCELADO" || prestamoActual.estado === "REFINANCIADO") {
-          throw new PagoRechazado(
-            { error: "No se pueden registrar pagos en un préstamo cancelado o refinanciado" },
-            409
-          );
-        }
-
-        const pendiente = Number(cuotaActual.montoTotal) - Number(cuotaActual.montoPagado);
-        if (parsed.data.monto > pendiente) {
-          throw new PagoRechazado(
-            {
-              error: `El monto supera el saldo pendiente de la cuota (${formatMonto(pendiente)})`,
-              code: "MONTO_EXCEDE_PENDIENTE",
-              pendiente,
-            },
-            400
-          );
-        }
-
-        const nuevoPago = await tx.pago.create({
-          data: {
-            empresaId: user.empresaId,
-            cuotaId: cuota.id,
-            prestamoId: prestamo.id,
-            usuarioId: user.usuarioId,
-            monto: parsed.data.monto,
-            metodoPago: parsed.data.metodoPago,
-            observacion: parsed.data.observacion,
-            idempotencyKey: parsed.data.idempotencyKey,
-          },
-        });
-
-        const nuevoMontoPagado = Number(cuotaActual.montoPagado) + parsed.data.monto;
-        const nuevoEstadoCuota =
-          nuevoMontoPagado >= Number(cuotaActual.montoTotal)
-            ? "PAGADA"
-            : nuevoMontoPagado > 0
-              ? "PARCIAL"
-              : "PENDIENTE";
-
-        await tx.cuota.update({
-          where: { id: cuota.id },
-          data: { montoPagado: nuevoMontoPagado, estado: nuevoEstadoCuota },
-        });
-
-        const cuotasDelPrestamo = await tx.cuota.findMany({
-          where: { prestamoId: prestamo.id },
-          select: { id: true, estado: true },
-        });
-        const todasPagadas = cuotasDelPrestamo.every((c) =>
-          c.id === cuota.id ? nuevoEstadoCuota === "PAGADA" : c.estado === "PAGADA"
+      if (prestamoActual.estado === "CANCELADO" || prestamoActual.estado === "REFINANCIADO") {
+        throw new PagoRechazado(
+          { error: "No se pueden registrar pagos en un préstamo cancelado o refinanciado" },
+          409
         );
-        if (todasPagadas) {
-          await tx.prestamo.update({
-            where: { id: prestamo.id },
-            data: { estado: "PAGADO" },
-          });
-        }
+      }
 
-        return nuevoPago;
-      }, TX_OPCIONES)
-    );
+      const pendiente = Number(cuotaActual.montoTotal) - Number(cuotaActual.montoPagado);
+      if (parsed.data.monto > pendiente) {
+        throw new PagoRechazado(
+          {
+            error: `El monto supera el saldo pendiente de la cuota (${formatMonto(pendiente)})`,
+            code: "MONTO_EXCEDE_PENDIENTE",
+            pendiente,
+          },
+          400
+        );
+      }
+
+      const nuevoPago = await tx.pago.create({
+        data: {
+          empresaId: user.empresaId,
+          cuotaId: cuota.id,
+          prestamoId: prestamo.id,
+          usuarioId: user.usuarioId,
+          monto: parsed.data.monto,
+          metodoPago: parsed.data.metodoPago,
+          observacion: parsed.data.observacion,
+          idempotencyKey: parsed.data.idempotencyKey,
+        },
+      });
+
+      const nuevoMontoPagado = Number(cuotaActual.montoPagado) + parsed.data.monto;
+      const nuevoEstadoCuota =
+        nuevoMontoPagado >= Number(cuotaActual.montoTotal)
+          ? "PAGADA"
+          : nuevoMontoPagado > 0
+            ? "PARCIAL"
+            : "PENDIENTE";
+
+      await tx.cuota.update({
+        where: { id: cuota.id },
+        data: { montoPagado: nuevoMontoPagado, estado: nuevoEstadoCuota },
+      });
+
+      const cuotasDelPrestamo = await tx.cuota.findMany({
+        where: { prestamoId: prestamo.id },
+        select: { id: true, estado: true },
+      });
+      const todasPagadas = cuotasDelPrestamo.every((c) =>
+        c.id === cuota.id ? nuevoEstadoCuota === "PAGADA" : c.estado === "PAGADA"
+      );
+      if (todasPagadas) {
+        await tx.prestamo.update({
+          where: { id: prestamo.id },
+          data: { estado: "PAGADO" },
+        });
+      }
+
+      return nuevoPago;
+    }, TX_OPCIONES);
 
     return NextResponse.json(pago, { status: 201 });
   } catch (error) {

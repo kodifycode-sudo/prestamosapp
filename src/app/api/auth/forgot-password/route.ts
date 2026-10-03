@@ -2,6 +2,7 @@ import crypto from "crypto";
 import prisma from "@/libs/prisma";
 import { NextRequest, NextResponse } from "next/server";
 import { ipDelCliente, minutosDeEspera, registrarIntento, superaLimite } from "@/lib/limite-intentos";
+import { escapeHtml } from "@/utils/html";
 
 export const dynamic = "force-dynamic";
 
@@ -70,7 +71,7 @@ export async function POST(request: NextRequest) {
         htmlContent: `
 <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
   <h2 style="color: #1a1a1a;">Restablecer contraseña</h2>
-  <p style="color: #555;">Hola <strong>${usuario.nombre}</strong>,</p>
+  <p style="color: #555;">Hola <strong>${escapeHtml(usuario.nombre)}</strong>,</p>
   <p style="color: #555;">
     Recibimos una solicitud para restablecer la contraseña de tu cuenta en PRESTO.
     Hacé clic en el botón para continuar:

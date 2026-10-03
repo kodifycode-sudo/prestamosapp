@@ -47,8 +47,8 @@ export async function PUT(request: NextRequest) {
     user.empresaId,
     user.usuarioId,
     user.empresaId,
-    () => prisma.empresa.findUnique({ where: { id: user.empresaId } }),
-    () => prisma.empresa.update({ where: { id: user.empresaId }, data })
+    (tx) => tx.empresa.findUnique({ where: { id: user.empresaId } }),
+    (tx) => tx.empresa.update({ where: { id: user.empresaId }, data })
   );
 
   return NextResponse.json(actualizada);

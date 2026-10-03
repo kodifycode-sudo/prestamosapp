@@ -4,6 +4,7 @@ import prisma from "@/libs/prisma";
 import { getUserFromToken } from "@/utils/getUserFromToken";
 import { auditUpdate } from "@/utils/auditoria";
 import { hashPassword } from "@/utils/hash";
+import { passwordSchema } from "@/lib/password";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +13,7 @@ const usuarioUpdateSchema = z.object({
   email: z.string().email().optional(),
   rol: z.enum(["ADMIN", "COBRADOR"]).optional(),
   activo: z.boolean().optional(),
-  password: z.string().min(6).optional(),
+  password: passwordSchema.optional(),
 });
 
 export async function PUT(
@@ -48,12 +49,12 @@ export async function PUT(
     user.empresaId,
     user.usuarioId,
     existente.id,
-    async () => {
-      const anterior = await prisma.usuario.findUnique({ where: { id: existente.id } });
+    async (tx) => {
+      const anterior = await tx.usuario.findUnique({ where: { id: existente.id } });
       return anterior ? { ...anterior, password: "***" } : null;
     },
-    async () => {
-      const guardado = await prisma.usuario.update({
+    async (tx) => {
+      const guardado = await tx.usuario.update({
         where: { id: existente.id },
         data: { ...rest, ...(password ? { password: await hashPassword(password) } : {}) },
       });

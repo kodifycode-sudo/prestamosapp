@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import prisma from "@/libs/prisma";
 import { getUserFromToken } from "@/utils/getUserFromToken";
+import { esUsuarioDeLaEmpresa } from "@/lib/clientes";
 import { auditCreate } from "@/utils/auditoria";
 import { scopeEmpresa } from "@/lib/scope";
 
@@ -66,9 +67,12 @@ export async function POST(request: NextRequest) {
   }
 
   const asignadoA = user.rol === "ADMIN" ? usuarioId ?? user.usuarioId : user.usuarioId;
+  if (!(await esUsuarioDeLaEmpresa(asignadoA, user.empresaId))) {
+    return NextResponse.json({ error: "Cobrador no encontrado" }, { status: 400 });
+  }
 
-  const nuevo = await auditCreate("Cliente", user.empresaId, user.usuarioId, () =>
-    prisma.cliente.create({
+  const nuevo = await auditCreate("Cliente", user.empresaId, user.usuarioId, (tx) =>
+    tx.cliente.create({
       data: { ...rest, empresaId: user.empresaId, email: email || undefined, usuarioId: asignadoA },
     })
   );

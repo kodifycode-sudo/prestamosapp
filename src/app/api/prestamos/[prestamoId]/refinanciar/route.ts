@@ -122,6 +122,11 @@ export async function POST(
         },
       });
 
+      await auditar("Refinanciacion", "CREATE", user.empresaId, user.usuarioId, {
+        registroId: refinanciacion.id,
+        newValues: refinanciacion,
+      }, tx);
+
       return { prestamoNuevo, refinanciacion };
     }, { maxWait: 10_000, timeout: 20_000 });
   } catch (error) {
@@ -130,15 +135,6 @@ export async function POST(
     }
     throw error;
   }
-
-  await auditar("Refinanciacion", "CREATE", user.empresaId, user.usuarioId, {
-    registroId: resultado.refinanciacion.id,
-    newValues: {
-      ...resultado.refinanciacion,
-      prestamoAnteriorId: prestamoAnterior.id,
-      prestamoNuevoId: resultado.prestamoNuevo.id,
-    },
-  });
 
   return NextResponse.json(resultado.prestamoNuevo, { status: 201 });
 }

@@ -68,8 +68,8 @@ export async function PUT(
     user.empresaId,
     user.usuarioId,
     prestamo.id,
-    () => prisma.prestamo.findUnique({ where: { id: prestamo.id } }),
-    () => prisma.prestamo.update({ where: { id: prestamo.id }, data: parsed.data })
+    (tx) => tx.prestamo.findUnique({ where: { id: prestamo.id } }),
+    (tx) => tx.prestamo.update({ where: { id: prestamo.id }, data: parsed.data })
   );
 
   return NextResponse.json(actualizado);
@@ -109,12 +109,11 @@ export async function DELETE(
     user.empresaId,
     user.usuarioId,
     prestamo.id,
-    () => prisma.prestamo.findUnique({ where: { id: prestamo.id } }),
-    () =>
-      prisma.$transaction([
-        prisma.cuota.deleteMany({ where: { prestamoId: prestamo.id } }),
-        prisma.prestamo.delete({ where: { id: prestamo.id } }),
-      ])
+    (tx) => tx.prestamo.findUnique({ where: { id: prestamo.id } }),
+    async (tx) => {
+      await tx.cuota.deleteMany({ where: { prestamoId: prestamo.id } });
+      await tx.prestamo.delete({ where: { id: prestamo.id } });
+    }
   );
 
   return NextResponse.json({ success: true });

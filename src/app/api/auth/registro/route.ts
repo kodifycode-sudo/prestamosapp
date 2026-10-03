@@ -3,6 +3,8 @@ import { z } from "zod";
 import prisma from "@/libs/prisma";
 import { hashPassword } from "@/utils/hash";
 import { auditar } from "@/utils/auditoria";
+import { passwordSchema } from "@/lib/password";
+import { escapeHtml } from "@/utils/html";
 
 export const dynamic = "force-dynamic";
 
@@ -11,10 +13,7 @@ const registroSchema = z
     empresaNombre: z.string().min(1, "El nombre de la empresa es obligatorio"),
     nombre: z.string().min(1, "El nombre es obligatorio"),
     email: z.string().email("Email inválido"),
-    password: z
-      .string()
-      .min(7, "La contraseña debe tener más de 6 caracteres")
-      .regex(/[A-Z]/, "La contraseña debe tener al menos una letra mayúscula"),
+    password: passwordSchema,
     confirmPassword: z.string(),
   })
   .refine((data) => data.password === data.confirmPassword, {
@@ -38,7 +37,7 @@ export async function POST(request: NextRequest) {
   // y activo: no hay otro administrador dentro de esa empresa que pueda
   // activarlo, a diferencia de los cobradores que se dan de alta desde
   // /usuarios dentro de una empresa ya existente (esos sí nacen inactivos).
-  const { empresa, nuevo } = await prisma.$transaction(async (tx) => {
+  const { nuevo } = await prisma.$transaction(async (tx) => {
     const empresa = await tx.empresa.create({ data: { nombre: parsed.data.empresaNombre } });
     const nuevo = await tx.usuario.create({
       data: {
@@ -50,16 +49,15 @@ export async function POST(request: NextRequest) {
         activo: true,
       },
     });
+    await auditar("Usuario", "CREATE", empresa.id, nuevo.id, {
+      registroId: nuevo.id,
+      newValues: { ...nuevo, password: "***" },
+    }, tx);
+    await auditar("Empresa", "CREATE", empresa.id, nuevo.id, {
+      registroId: empresa.id,
+      newValues: empresa,
+    }, tx);
     return { empresa, nuevo };
-  });
-
-  await auditar("Usuario", "CREATE", empresa.id, nuevo.id, {
-    registroId: nuevo.id,
-    newValues: { ...nuevo, password: "***" },
-  });
-  await auditar("Empresa", "CREATE", empresa.id, nuevo.id, {
-    registroId: empresa.id,
-    newValues: empresa,
   });
 
   await enviarCorreoBienvenida(nuevo.email, nuevo.nombre);
@@ -95,7 +93,7 @@ async function enviarCorreoBienvenida(email: string, nombre: string) {
       <span style="font-size: 40px;">🏦</span>
     </div>
     <h2 style="color: #1a1a1a; text-align: center; margin-top: 0;">¡Bienvenido a PRESTO!</h2>
-    <p style="color: #555; line-height: 1.5;">Hola <strong>${nombre}</strong>,</p>
+    <p style="color: #555; line-height: 1.5;">Hola <strong>${escapeHtml(nombre)}</strong>,</p>
     <p style="color: #555; line-height: 1.5;">
       Gracias por registrarte en <strong>PRESTO</strong>. Tu cuenta ya está lista para que empieces
       a gestionar los préstamos de tu empresa de forma simple y ordenada.

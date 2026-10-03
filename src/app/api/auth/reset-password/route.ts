@@ -1,6 +1,7 @@
 import prisma from "@/libs/prisma";
 import { hashPassword } from "@/utils/hash";
 import { NextRequest, NextResponse } from "next/server";
+import { passwordSchema } from "@/lib/password";
 
 export const dynamic = "force-dynamic";
 
@@ -14,11 +15,9 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (typeof password !== "string" || password.length < 6) {
-    return NextResponse.json(
-      { error: "La contraseña debe tener al menos 6 caracteres" },
-      { status: 400 }
-    );
+  const passwordValida = passwordSchema.safeParse(password);
+  if (!passwordValida.success) {
+    return NextResponse.json({ error: passwordValida.error.issues[0].message }, { status: 400 });
   }
 
   const resetToken = await prisma.passwordResetToken.findUnique({ where: { token } });

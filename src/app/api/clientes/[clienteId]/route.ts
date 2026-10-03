@@ -3,6 +3,7 @@ import { z } from "zod";
 import prisma from "@/libs/prisma";
 import { getUserFromToken, type TokenPayload } from "@/utils/getUserFromToken";
 import { auditDelete, auditUpdate } from "@/utils/auditoria";
+import { esUsuarioDeLaEmpresa } from "@/lib/clientes";
 
 export const dynamic = "force-dynamic";
 
@@ -63,6 +64,9 @@ export async function PUT(
   }
 
   const { email, usuarioId, ...rest } = parsed.data;
+  if (user.rol === "ADMIN" && usuarioId && !(await esUsuarioDeLaEmpresa(usuarioId, user.empresaId))) {
+    return NextResponse.json({ error: "Cobrador no encontrado" }, { status: 400 });
+  }
   const data = {
     ...rest,
     ...(email !== undefined ? { email: email || null } : {}),
@@ -74,8 +78,8 @@ export async function PUT(
     user.empresaId,
     user.usuarioId,
     cliente.id,
-    () => prisma.cliente.findUnique({ where: { id: cliente.id } }),
-    () => prisma.cliente.update({ where: { id: cliente.id }, data })
+    (tx) => tx.cliente.findUnique({ where: { id: cliente.id } }),
+    (tx) => tx.cliente.update({ where: { id: cliente.id }, data })
   );
 
   return NextResponse.json(actualizado);
@@ -107,8 +111,8 @@ export async function DELETE(
     user.empresaId,
     user.usuarioId,
     cliente.id,
-    () => prisma.cliente.findUnique({ where: { id: cliente.id } }),
-    () => prisma.cliente.delete({ where: { id: cliente.id } })
+    (tx) => tx.cliente.findUnique({ where: { id: cliente.id } }),
+    (tx) => tx.cliente.delete({ where: { id: cliente.id } })
   );
 
   return NextResponse.json({ success: true });

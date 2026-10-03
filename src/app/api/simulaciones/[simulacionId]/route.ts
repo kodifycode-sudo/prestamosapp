@@ -67,8 +67,8 @@ export async function PUT(
     user.empresaId,
     user.usuarioId,
     simulacion.id,
-    () => prisma.simulacion.findUnique({ where: { id: simulacion.id } }),
-    () => prisma.simulacion.update({ where: { id: simulacion.id }, data })
+    (tx) => tx.simulacion.findUnique({ where: { id: simulacion.id } }),
+    (tx) => tx.simulacion.update({ where: { id: simulacion.id }, data })
   );
 
   return NextResponse.json(actualizada);
@@ -90,8 +90,8 @@ export async function DELETE(
     user.empresaId,
     user.usuarioId,
     simulacion.id,
-    () => prisma.simulacion.findUnique({ where: { id: simulacion.id } }),
-    () => prisma.simulacion.delete({ where: { id: simulacion.id } })
+    (tx) => tx.simulacion.findUnique({ where: { id: simulacion.id } }),
+    (tx) => tx.simulacion.delete({ where: { id: simulacion.id } })
   );
 
   return NextResponse.json({ success: true });

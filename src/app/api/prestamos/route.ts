@@ -6,6 +6,7 @@ import { getUserFromToken } from "@/utils/getUserFromToken";
 import { auditCreate } from "@/utils/auditoria";
 import { generarCuotas } from "@/lib/prestamos";
 import { scopeEmpresa } from "@/lib/scope";
+import { leerPaginacion } from "@/lib/paginacion";
 
 export const dynamic = "force-dynamic";
 
@@ -26,12 +27,16 @@ export async function GET(request: NextRequest) {
   const clienteId = request.nextUrl.searchParams.get("clienteId") ?? undefined;
   const estado = request.nextUrl.searchParams.get("estado") ?? undefined;
 
+  const pagina = leerPaginacion(request.nextUrl.searchParams);
+  const where = {
+    ...scopeEmpresa(user),
+    ...(clienteId ? { clienteId } : {}),
+    ...(estado ? { estado: estado as never } : {}),
+  };
+
   const prestamos = await prisma.prestamo.findMany({
-    where: {
-      ...scopeEmpresa(user),
-      ...(clienteId ? { clienteId } : {}),
-      ...(estado ? { estado: estado as never } : {}),
-    },
+    where,
+    ...pagina,
     include: {
       cliente: { select: { id: true, nombre: true, apellido: true } },
       fuenteIngreso: { select: { id: true, nombre: true } },
@@ -39,7 +44,9 @@ export async function GET(request: NextRequest) {
     orderBy: { createdAt: "desc" },
   });
 
-  return NextResponse.json(prestamos);
+  if (!pagina.take) return NextResponse.json(prestamos);
+  const total = await prisma.prestamo.count({ where });
+  return NextResponse.json(prestamos, { headers: { "X-Total-Count": String(total) } });
 }
 
 export async function POST(request: NextRequest) {
@@ -77,41 +84,39 @@ export async function POST(request: NextRequest) {
     fechaInicio: data.fechaInicio,
   });
 
-  const prestamo = await auditCreate("Prestamo", user.empresaId, user.usuarioId, () =>
-    prisma.$transaction(async (tx) => {
-      const nuevo = await tx.prestamo.create({
-        data: {
-          empresaId: user.empresaId,
-          clienteId: data.clienteId,
-          usuarioId: cliente.usuarioId,
-          fuenteIngresoId: data.fuenteIngresoId,
-          monto: data.monto,
-          interes: data.interes,
-          cantidadCuotas: data.cantidadCuotas,
-          frecuencia: data.frecuencia,
-          fechaInicio: data.fechaInicio,
-        },
-      });
+  const prestamo = await auditCreate("Prestamo", user.empresaId, user.usuarioId, async (tx) => {
+    const nuevo = await tx.prestamo.create({
+      data: {
+        empresaId: user.empresaId,
+        clienteId: data.clienteId,
+        usuarioId: cliente.usuarioId,
+        fuenteIngresoId: data.fuenteIngresoId,
+        monto: data.monto,
+        interes: data.interes,
+        cantidadCuotas: data.cantidadCuotas,
+        frecuencia: data.frecuencia,
+        fechaInicio: data.fechaInicio,
+      },
+    });
 
-      await tx.cuota.createMany({
-        data: cuotasCalculadas.map((cuota) => ({
-          prestamoId: nuevo.id,
-          numero: cuota.numero,
-          fechaVencimiento: cuota.fechaVencimiento,
-          montoCapital: cuota.montoCapital,
-          montoInteres: cuota.montoInteres,
-          montoTotal: cuota.montoTotal,
-        })),
-      });
+    await tx.cuota.createMany({
+      data: cuotasCalculadas.map((cuota) => ({
+        prestamoId: nuevo.id,
+        numero: cuota.numero,
+        fechaVencimiento: cuota.fechaVencimiento,
+        montoCapital: cuota.montoCapital,
+        montoInteres: cuota.montoInteres,
+        montoTotal: cuota.montoTotal,
+      })),
+    });
 
-      const cuotas = await tx.cuota.findMany({
-        where: { prestamoId: nuevo.id },
-        orderBy: { numero: "asc" },
-      });
+    const cuotas = await tx.cuota.findMany({
+      where: { prestamoId: nuevo.id },
+      orderBy: { numero: "asc" },
+    });
 
-      return { ...nuevo, cuotas };
-    })
-  );
+    return { ...nuevo, cuotas };
+  });
 
   return NextResponse.json(prestamo, { status: 201 });
 }

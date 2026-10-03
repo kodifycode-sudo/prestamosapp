@@ -8,6 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { passwordSchema } from "@/lib/password";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
@@ -19,10 +20,7 @@ const registroSchema = z
     empresaNombre: z.string().min(1, "El nombre de la empresa es obligatorio"),
     nombre: z.string().min(1, "El nombre es obligatorio"),
     email: z.string().email("Email inválido"),
-    password: z
-      .string()
-      .min(7, "La contraseña debe tener más de 6 caracteres")
-      .regex(/[A-Z]/, "La contraseña debe tener al menos una letra mayúscula"),
+    password: passwordSchema,
     confirmPassword: z.string(),
   })
   .refine((data) => data.password === data.confirmPassword, {

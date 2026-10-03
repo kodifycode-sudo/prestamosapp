@@ -37,7 +37,7 @@ export async function PUT(
     user.usuarioId,
     existente.id,
     async () => existente,
-    () => prisma.fuenteIngreso.update({ where: { id: existente.id }, data: parsed.data })
+    (tx) => tx.fuenteIngreso.update({ where: { id: existente.id }, data: parsed.data })
   );
 
   return NextResponse.json(actualizada);
@@ -71,8 +71,8 @@ export async function DELETE(
     user.empresaId,
     user.usuarioId,
     existente.id,
-    () => prisma.fuenteIngreso.findUnique({ where: { id: existente.id } }),
-    () => prisma.fuenteIngreso.delete({ where: { id: existente.id } })
+    (tx) => tx.fuenteIngreso.findUnique({ where: { id: existente.id } }),
+    (tx) => tx.fuenteIngreso.delete({ where: { id: existente.id } })
   );
 
   return NextResponse.json({ success: true });

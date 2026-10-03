@@ -159,7 +159,7 @@ export function AppShell({
   }
 
   async function handleLogout() {
-    await fetch("/api/auth/logout");
+    await fetch("/api/auth/logout", { method: "POST" });
     router.push("/auth/login");
     router.refresh();
   }

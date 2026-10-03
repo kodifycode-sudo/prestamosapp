@@ -42,8 +42,8 @@ export async function POST(request: NextRequest) {
 
   const { clienteEmail, ...rest } = parsed.data;
 
-  const nueva = await auditCreate("Simulacion", user.empresaId, user.usuarioId, () =>
-    prisma.simulacion.create({
+  const nueva = await auditCreate("Simulacion", user.empresaId, user.usuarioId, (tx) =>
+    tx.simulacion.create({
       data: {
         ...rest,
         empresaId: user.empresaId,

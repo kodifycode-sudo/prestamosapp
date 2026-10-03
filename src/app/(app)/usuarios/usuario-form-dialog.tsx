@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { passwordSchema } from "@/lib/password";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -44,7 +45,8 @@ const formSchema = z.object({
   email: z.string().email("Email inválido"),
   rol: z.enum(["ADMIN", "COBRADOR"]),
   activo: z.boolean(),
-  password: z.string().optional(),
+  // Vacío = no cambiar la contraseña.
+  password: passwordSchema.or(z.literal("")).optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;

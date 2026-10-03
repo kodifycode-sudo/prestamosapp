@@ -34,8 +34,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const nueva = await auditCreate("FuenteIngreso", user.empresaId, user.usuarioId, () =>
-    prisma.fuenteIngreso.create({
+  const nueva = await auditCreate("FuenteIngreso", user.empresaId, user.usuarioId, (tx) =>
+    tx.fuenteIngreso.create({
       data: {
         empresaId: user.empresaId,
         nombre: parsed.data.nombre,
