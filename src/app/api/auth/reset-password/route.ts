@@ -59,7 +59,8 @@ export async function POST(request: NextRequest) {
     if (count === 0) return false;
     await tx.usuario.update({
       where: { email: resetToken.email },
-      data: { password: hashedPassword },
+      // Cierra las sesiones abiertas con la contraseña anterior.
+      data: { password: hashedPassword, sesionVersion: { increment: 1 } },
     });
     return true;
   });

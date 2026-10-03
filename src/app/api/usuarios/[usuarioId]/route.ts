@@ -58,7 +58,11 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ usuar
       async (tx) => {
         const guardado = await tx.usuario.update({
           where: { id: existente.id },
-          data: { ...rest, ...(password ? { password: await hashPassword(password) } : {}) },
+          data: {
+            ...rest,
+            // Una contraseña nueva cierra las sesiones abiertas con la anterior.
+            ...(password ? { password: await hashPassword(password), sesionVersion: { increment: 1 } } : {}),
+          },
         });
         return { ...guardado, password: "***" };
       }

@@ -76,6 +76,7 @@ export async function POST(request: NextRequest) {
       email: user.email,
       nombre: user.nombre,
       rol: user.rol,
+      sv: user.sesionVersion,
     },
     process.env.JWT_SECRET
   );

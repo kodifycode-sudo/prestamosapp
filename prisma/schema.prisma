@@ -85,14 +85,16 @@ model FuenteIngreso {
 }
 
 model Usuario {
-  id        String   @id @default(cuid())
-  empresaId String
-  nombre    String
-  email     String   @unique
-  password  String
-  rol       Rol      @default(COBRADOR)
-  activo    Boolean  @default(true)
-  createdAt DateTime @default(now())
+  id            String   @id @default(cuid())
+  empresaId     String
+  nombre        String
+  email         String   @unique
+  password      String
+  rol           Rol      @default(COBRADOR)
+  activo        Boolean  @default(true)
+  /// Se incrementa al cambiar la contraseña: invalida los tokens emitidos antes.
+  sesionVersion Int      @default(0)
+  createdAt     DateTime @default(now())
 
   empresa Empresa @relation(fields: [empresaId], references: [id])
 
@@ -230,21 +232,21 @@ model Pago {
 }
 
 model Simulacion {
-  id             String      @id @default(cuid())
+  id             String       @id @default(cuid())
   empresaId      String
   usuarioId      String
   clienteNombre  String
   clienteEmail   String?
-  monto          Decimal     @db.Decimal(12, 2)
-  interes        Decimal?    @db.Decimal(12, 2)
-  tasaInteres    Decimal?    @db.Decimal(6, 3)
-  iva            Decimal     @default(0) @db.Decimal(5, 2)
+  monto          Decimal      @db.Decimal(12, 2)
+  interes        Decimal?     @db.Decimal(12, 2)
+  tasaInteres    Decimal?     @db.Decimal(6, 3)
+  iva            Decimal      @default(0) @db.Decimal(5, 2)
   cantidadCuotas Int
   tipoInteres    TipoInteres?
   frecuencia     Frecuencia
   fechaInicio    DateTime
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   empresa Empresa @relation(fields: [empresaId], references: [id])
   usuario Usuario @relation(fields: [usuarioId], references: [id])
