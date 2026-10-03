@@ -18,22 +18,23 @@ export type ReporteCartera = {
 
 export async function getReporteCartera(user: TokenPayload): Promise<ReporteCartera> {
   const hoy = hoyCalendario();
-  const prestamos = await prisma.prestamo.findMany({
-    where: scopeUsuario(user),
-    select: {
-      estado: true,
-      monto: true,
-      tipoInteres: true,
-      frecuencia: true,
-      usuarioId: true,
-      cuotas: { select: { estado: true, montoTotal: true, montoPagado: true, fechaVencimiento: true } },
-    },
-  });
-
-  const totalPagos = await prisma.pago.aggregate({
-    where: scopeUsuario(user),
-    _sum: { monto: true },
-  });
+  const [prestamos, totalPagos] = await Promise.all([
+    prisma.prestamo.findMany({
+      where: scopeUsuario(user),
+      select: {
+        estado: true,
+        monto: true,
+        tipoInteres: true,
+        frecuencia: true,
+        usuarioId: true,
+        cuotas: { select: { estado: true, montoTotal: true, montoPagado: true, fechaVencimiento: true } },
+      },
+    }),
+    prisma.pago.aggregate({
+      where: scopeUsuario(user),
+      _sum: { monto: true },
+    }),
+  ]);
 
   const porEstadoMap = new Map<string, { cantidad: number; monto: number }>();
   const porTipoMap = new Map<string, number>();

@@ -181,6 +181,7 @@ model Prestamo {
   @@index([usuarioId])
   @@index([empresaId])
   @@index([fuenteIngresoId])
+  @@index([empresaId, estado])
 }
 
 model Cuota {
@@ -199,6 +200,7 @@ model Cuota {
   pagos    Pago[]
 
   @@index([prestamoId])
+  @@index([fechaVencimiento, estado])
 }
 
 model Pago {
@@ -224,6 +226,7 @@ model Pago {
   @@index([prestamoId])
   @@index([usuarioId])
   @@index([empresaId])
+  @@index([empresaId, fechaPago])
 }
 
 model Simulacion {
@@ -287,4 +290,5 @@ model Auditoria {
   @@index([tabla])
   @@index([usuarioId])
   @@index([empresaId])
+  @@index([empresaId, createdAt])
 }
