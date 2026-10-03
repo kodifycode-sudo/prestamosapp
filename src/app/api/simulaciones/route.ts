@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
   const user = await getUserFromToken();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
-  const body = await request.json();
+  const body = await request.json().catch(() => null);
   const parsed = simulacionSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });

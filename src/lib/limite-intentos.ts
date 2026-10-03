@@ -1,7 +1,7 @@
 import { headers } from "next/headers";
 import prisma from "@/libs/prisma";
 
-export type TipoIntento = "LOGIN" | "RESET";
+export type TipoIntento = "LOGIN" | "RESET" | "REGISTRO";
 
 const MINUTO_MS = 60 * 1000;
 
@@ -12,6 +12,7 @@ const MINUTO_MS = 60 * 1000;
 const REGLAS: Record<TipoIntento, { ventanaMs: number; porEmail: number; porIp: number }> = {
   LOGIN: { ventanaMs: 15 * MINUTO_MS, porEmail: 5, porIp: 30 },
   RESET: { ventanaMs: 60 * MINUTO_MS, porEmail: 3, porIp: 10 },
+  REGISTRO: { ventanaMs: 60 * MINUTO_MS, porEmail: 3, porIp: 5 },
 };
 
 /** Los registros más viejos que esto ya no cuentan para ninguna regla. */

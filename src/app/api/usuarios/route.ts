@@ -6,6 +6,7 @@ import { auditCreate } from "@/utils/auditoria";
 import { hashPassword } from "@/utils/hash";
 import { passwordSchema } from "@/lib/password";
 import { emailSchema } from "@/lib/email";
+import { esDuplicado } from "@/lib/errores";
 
 export const dynamic = "force-dynamic";
 
@@ -35,7 +36,7 @@ export async function POST(request: NextRequest) {
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   if (user.rol !== "ADMIN") return NextResponse.json({ error: "No autorizado" }, { status: 403 });
 
-  const body = await request.json();
+  const body = await request.json().catch(() => null);
   const parsed = usuarioSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
@@ -46,18 +47,26 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Ya existe un usuario con ese email" }, { status: 409 });
   }
 
-  const nuevo = await auditCreate("Usuario", user.empresaId, user.usuarioId, async (tx) => {
-    const creado = await tx.usuario.create({
-      data: {
-        empresaId: user.empresaId,
-        nombre: parsed.data.nombre,
-        email: parsed.data.email,
-        password: await hashPassword(parsed.data.password),
-        rol: parsed.data.rol,
-      },
+  let nuevo;
+  try {
+    nuevo = await auditCreate("Usuario", user.empresaId, user.usuarioId, async (tx) => {
+      const creado = await tx.usuario.create({
+        data: {
+          empresaId: user.empresaId,
+          nombre: parsed.data.nombre,
+          email: parsed.data.email,
+          password: await hashPassword(parsed.data.password),
+          rol: parsed.data.rol,
+        },
+      });
+      return { ...creado, password: "***" };
     });
-    return { ...creado, password: "***" };
-  });
+  } catch (error) {
+    if (esDuplicado(error)) {
+      return NextResponse.json({ error: "Ya existe un usuario con ese email" }, { status: 409 });
+    }
+    throw error;
+  }
 
   return NextResponse.json(nuevo, { status: 201 });
 }

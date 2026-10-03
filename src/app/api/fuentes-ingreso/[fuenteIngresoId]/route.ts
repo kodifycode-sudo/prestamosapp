@@ -26,7 +26,7 @@ export async function PUT(
     return NextResponse.json({ error: "Fuente de ingreso no encontrada" }, { status: 404 });
   }
 
-  const body = await request.json();
+  const body = await request.json().catch(() => null);
   const parsed = fuenteIngresoUpdateSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });

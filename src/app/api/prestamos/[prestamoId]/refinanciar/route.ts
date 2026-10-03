@@ -40,7 +40,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ pres
     );
   }
 
-  const body = await request.json();
+  const body = await request.json().catch(() => null);
   const parsed = refinanciarSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });

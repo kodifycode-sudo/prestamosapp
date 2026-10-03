@@ -6,6 +6,8 @@ import { auditar } from "@/utils/auditoria";
 import { passwordSchema } from "@/lib/password";
 import { escapeHtml } from "@/utils/html";
 import { emailSchema } from "@/lib/email";
+import { esDuplicado } from "@/lib/errores";
+import { ipDelCliente, minutosDeEspera, registrarIntento, superaLimite } from "@/lib/limite-intentos";
 
 export const dynamic = "force-dynamic";
 
@@ -22,44 +24,65 @@ const registroSchema = z
     path: ["confirmPassword"],
   });
 
+const EMAIL_EN_USO = "Ya existe un usuario con ese email";
+
 export async function POST(request: NextRequest) {
-  const body = await request.json();
+  const body = await request.json().catch(() => null);
   const parsed = registroSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
+  const ip = await ipDelCliente();
+  if (await superaLimite("REGISTRO", parsed.data.email, ip)) {
+    return NextResponse.json(
+      {
+        error: `Demasiados registros desde esta conexión. Esperá ${minutosDeEspera("REGISTRO")} minutos e intentá de nuevo.`,
+      },
+      { status: 429 }
+    );
+  }
+  // Cada intento cuenta, salga bien o no: evita crear empresas o mandar correos en masa.
+  await registrarIntento("REGISTRO", parsed.data.email, ip);
+
   const existente = await prisma.usuario.findUnique({ where: { email: parsed.data.email } });
   if (existente) {
-    return NextResponse.json({ error: "Ya existe un usuario con ese email" }, { status: 409 });
+    return NextResponse.json({ error: EMAIL_EN_USO }, { status: 409 });
   }
 
   // El registro público crea una empresa nueva. Su primer usuario nace ADMIN
   // y activo: no hay otro administrador dentro de esa empresa que pueda
   // activarlo, a diferencia de los cobradores que se dan de alta desde
   // /usuarios dentro de una empresa ya existente (esos sí nacen inactivos).
-  const { nuevo } = await prisma.$transaction(async (tx) => {
-    const empresa = await tx.empresa.create({ data: { nombre: parsed.data.empresaNombre } });
-    const nuevo = await tx.usuario.create({
-      data: {
-        empresaId: empresa.id,
-        nombre: parsed.data.nombre,
-        email: parsed.data.email,
-        password: await hashPassword(parsed.data.password),
-        rol: "ADMIN",
-        activo: true,
-      },
+  let nuevo;
+  try {
+    nuevo = await prisma.$transaction(async (tx) => {
+      const empresa = await tx.empresa.create({ data: { nombre: parsed.data.empresaNombre } });
+      const creado = await tx.usuario.create({
+        data: {
+          empresaId: empresa.id,
+          nombre: parsed.data.nombre,
+          email: parsed.data.email,
+          password: await hashPassword(parsed.data.password),
+          rol: "ADMIN",
+          activo: true,
+        },
+      });
+      await auditar("Usuario", "CREATE", empresa.id, creado.id, {
+        registroId: creado.id,
+        newValues: { ...creado, password: "***" },
+      }, tx);
+      await auditar("Empresa", "CREATE", empresa.id, creado.id, {
+        registroId: empresa.id,
+        newValues: empresa,
+      }, tx);
+      return creado;
     });
-    await auditar("Usuario", "CREATE", empresa.id, nuevo.id, {
-      registroId: nuevo.id,
-      newValues: { ...nuevo, password: "***" },
-    }, tx);
-    await auditar("Empresa", "CREATE", empresa.id, nuevo.id, {
-      registroId: empresa.id,
-      newValues: empresa,
-    }, tx);
-    return { empresa, nuevo };
-  });
+  } catch (error) {
+    // Dos registros simultáneos con el mismo email: el segundo choca con el índice único.
+    if (esDuplicado(error)) return NextResponse.json({ error: EMAIL_EN_USO }, { status: 409 });
+    throw error;
+  }
 
   await enviarCorreoBienvenida(nuevo.email, nuevo.nombre);
 

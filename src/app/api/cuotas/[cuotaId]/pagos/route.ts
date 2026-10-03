@@ -45,7 +45,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ cuot
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
-  const body = await request.json();
+  const body = await request.json().catch(() => null);
   const parsed = pagoSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });

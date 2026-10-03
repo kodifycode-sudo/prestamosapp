@@ -49,7 +49,7 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ simul
   if (forbidden) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   if (!simulacion) return NextResponse.json({ error: "Simulación no encontrada" }, { status: 404 });
 
-  const body = await request.json();
+  const body = await request.json().catch(() => null);
   const parsed = simulacionUpdateSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
