@@ -11,11 +11,12 @@ import {
 } from "@/lib/reportes-queries";
 import { ReportesTabs } from "./reportes-tabs";
 
-export default async function ReportesPage({
-  searchParams,
-}: {
-  searchParams: { desde?: string; hasta?: string; tab?: string };
-}) {
+export default async function ReportesPage(
+  props: {
+    searchParams: Promise<{ desde?: string; hasta?: string; tab?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const user = await getUserFromToken();
   if (!user) redirect("/auth/salir");
 

@@ -3,11 +3,12 @@ import { getUserFromToken } from "@/utils/getUserFromToken";
 import { getPrestamosRefinanciables } from "@/lib/refinanciaciones-queries";
 import { RefinanciacionForm } from "./refinanciacion-form";
 
-export default async function NuevaRefinanciacionPage({
-  searchParams,
-}: {
-  searchParams: { prestamoId?: string };
-}) {
+export default async function NuevaRefinanciacionPage(
+  props: {
+    searchParams: Promise<{ prestamoId?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const user = await getUserFromToken();
   if (!user) redirect("/auth/salir");
 

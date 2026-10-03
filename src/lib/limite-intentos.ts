@@ -22,8 +22,8 @@ export function minutosDeEspera(tipo: TipoIntento) {
 }
 
 /** IP del cliente; en Vercel la primera de x-forwarded-for es la del visitante. */
-export function ipDelCliente(): string {
-  const h = headers();
+export async function ipDelCliente(): Promise<string> {
+  const h = await headers();
   const forwarded = h.get("x-forwarded-for")?.split(",")[0]?.trim();
   return forwarded || h.get("x-real-ip") || "desconocida";
 }

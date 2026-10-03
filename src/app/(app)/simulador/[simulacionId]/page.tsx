@@ -14,11 +14,12 @@ import {
 } from "@/components/ui/table";
 import { SimulacionDetailActions } from "./simulacion-detail-actions";
 
-export default async function SimulacionDetailPage({
-  params,
-}: {
-  params: { simulacionId: string };
-}) {
+export default async function SimulacionDetailPage(
+  props: {
+    params: Promise<{ simulacionId: string }>;
+  }
+) {
+  const params = await props.params;
   const user = await getUserFromToken();
   if (!user) redirect("/auth/salir");
 

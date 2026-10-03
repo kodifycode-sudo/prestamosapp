@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -51,6 +51,35 @@ const navItems: NavItem[] = [
 ];
 
 const SIDEBAR_STORAGE_KEY = "sidebar-collapsed";
+const SIDEBAR_EVENTO = "sidebar-collapsed-change";
+
+// Preferencia del menú lateral en localStorage, leída como store externo:
+// en el servidor (y en la hidratación) vale false, luego el valor guardado.
+function leerSidebarColapsado() {
+  try {
+    return localStorage.getItem(SIDEBAR_STORAGE_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function guardarSidebarColapsado(valor: boolean) {
+  try {
+    localStorage.setItem(SIDEBAR_STORAGE_KEY, String(valor));
+  } catch {
+    // Sin almacenamiento disponible: el cambio no persiste.
+  }
+  window.dispatchEvent(new Event(SIDEBAR_EVENTO));
+}
+
+function suscribirSidebar(onChange: () => void) {
+  window.addEventListener(SIDEBAR_EVENTO, onChange);
+  window.addEventListener("storage", onChange);
+  return () => {
+    window.removeEventListener(SIDEBAR_EVENTO, onChange);
+    window.removeEventListener("storage", onChange);
+  };
+}
 
 type SidebarUser = { nombre: string; email: string; rol: string };
 
@@ -139,23 +168,14 @@ export function AppShell({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [collapsed, setCollapsed] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
-
-  useEffect(() => {
-    setCollapsed(localStorage.getItem(SIDEBAR_STORAGE_KEY) === "true");
-  }, []);
-
-  useEffect(() => {
-    setMobileOpen(false);
-  }, [pathname]);
+  const collapsed = useSyncExternalStore(suscribirSidebar, leerSidebarColapsado, () => false);
+  // El menú móvil queda abierto solo en la ruta donde se abrió: al navegar se cierra solo.
+  const [menuAbiertoEn, setMenuAbiertoEn] = useState<string | null>(null);
+  const mobileOpen = menuAbiertoEn === pathname;
+  const setMobileOpen = (open: boolean) => setMenuAbiertoEn(open ? pathname : null);
 
   function toggleCollapsed() {
-    setCollapsed((prev) => {
-      const next = !prev;
-      localStorage.setItem(SIDEBAR_STORAGE_KEY, String(next));
-      return next;
-    });
+    guardarSidebarColapsado(!collapsed);
   }
 
   async function handleLogout() {

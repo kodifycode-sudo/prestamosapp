@@ -5,10 +5,8 @@ import { renderSimulacionPdf } from "@/lib/pdf/simulacion-pdf";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { simulacionId: string } }
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ simulacionId: string }> }) {
+  const params = await props.params;
   const user = await getUserFromToken();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 

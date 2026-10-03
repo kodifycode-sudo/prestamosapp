@@ -14,8 +14,9 @@ const fuenteIngresoUpdateSchema = z.object({
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { fuenteIngresoId: string } }
+  props: { params: Promise<{ fuenteIngresoId: string }> }
 ) {
+  const params = await props.params;
   const user = await getUserFromToken();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   if (user.rol !== "ADMIN") return NextResponse.json({ error: "No autorizado" }, { status: 403 });
@@ -45,8 +46,9 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { fuenteIngresoId: string } }
+  props: { params: Promise<{ fuenteIngresoId: string }> }
 ) {
+  const params = await props.params;
   const user = await getUserFromToken();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   if (user.rol !== "ADMIN") return NextResponse.json({ error: "No autorizado" }, { status: 403 });

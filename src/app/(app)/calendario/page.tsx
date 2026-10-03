@@ -13,11 +13,12 @@ function parseMes(value?: string) {
   return inicioMesCalendario(hoyCalendario());
 }
 
-export default async function CalendarioPage({
-  searchParams,
-}: {
-  searchParams: { mes?: string };
-}) {
+export default async function CalendarioPage(
+  props: {
+    searchParams: Promise<{ mes?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const user = await getUserFromToken();
   if (!user) redirect("/auth/salir");
 

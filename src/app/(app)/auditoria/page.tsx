@@ -7,11 +7,12 @@ function parseList(value?: string) {
   return value ? value.split(",").filter(Boolean) : [];
 }
 
-export default async function AuditoriaPage({
-  searchParams,
-}: {
-  searchParams: { tabla?: string; accion?: string; q?: string };
-}) {
+export default async function AuditoriaPage(
+  props: {
+    searchParams: Promise<{ tabla?: string; accion?: string; q?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const user = await getUserFromToken();
   if (!user) redirect("/auth/salir");
   if (user.rol !== "ADMIN") redirect("/dashboard");

@@ -19,10 +19,8 @@ async function getPrestamoScoped(prestamoId: string, user: TokenPayload) {
   return { prestamo, forbidden: false };
 }
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { prestamoId: string } }
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ prestamoId: string }> }) {
+  const params = await props.params;
   const user = await getUserFromToken();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
@@ -39,10 +37,8 @@ export async function GET(
   return NextResponse.json({ ...prestamo, cliente, cuotas });
 }
 
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: { prestamoId: string } }
-) {
+export async function PUT(request: NextRequest, props: { params: Promise<{ prestamoId: string }> }) {
+  const params = await props.params;
   const user = await getUserFromToken();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
@@ -75,10 +71,8 @@ export async function PUT(
   return NextResponse.json(actualizado);
 }
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { prestamoId: string } }
-) {
+export async function DELETE(request: NextRequest, props: { params: Promise<{ prestamoId: string }> }) {
+  const params = await props.params;
   const user = await getUserFromToken();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 

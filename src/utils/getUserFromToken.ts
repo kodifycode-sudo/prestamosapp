@@ -23,12 +23,12 @@ export const getUserFromToken = cache(async (): Promise<TokenPayload | null> => 
   }
 
   // 1. Cookie (web)
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   let rawToken = cookieStore.get("tokenPrestamos")?.value;
 
   // 2. Authorization: Bearer (mobile)
   if (!rawToken) {
-    const headerStore = headers();
+    const headerStore = await headers();
     const auth = headerStore.get("authorization") ?? headerStore.get("Authorization");
     if (auth?.startsWith("Bearer ")) {
       rawToken = auth.slice(7);

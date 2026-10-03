@@ -29,10 +29,8 @@ class PagoRechazado extends Error {
   }
 }
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { cuotaId: string } }
-) {
+export async function POST(request: NextRequest, props: { params: Promise<{ cuotaId: string }> }) {
+  const params = await props.params;
   const user = await getUserFromToken();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 

@@ -7,11 +7,12 @@ function parseList(value?: string) {
   return value ? value.split(",").filter(Boolean) : [];
 }
 
-export default async function PagosPage({
-  searchParams,
-}: {
-  searchParams: { metodo?: string; cobrador?: string; desde?: string; hasta?: string; q?: string };
-}) {
+export default async function PagosPage(
+  props: {
+    searchParams: Promise<{ metodo?: string; cobrador?: string; desde?: string; hasta?: string; q?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const user = await getUserFromToken();
   if (!user) redirect("/auth/salir");
 

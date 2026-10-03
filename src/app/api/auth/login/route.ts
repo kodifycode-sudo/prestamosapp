@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Ingresá email y contraseña" }, { status: 400 });
   }
   const { email, password } = parsed.data;
-  const ip = ipDelCliente();
+  const ip = await ipDelCliente();
 
   if (await superaLimite("LOGIN", email, ip)) {
     return NextResponse.json(

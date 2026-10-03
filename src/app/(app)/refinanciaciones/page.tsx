@@ -3,11 +3,12 @@ import { getUserFromToken } from "@/utils/getUserFromToken";
 import { getRefinanciacionesForUser } from "@/lib/refinanciaciones-queries";
 import { RefinanciacionesTable } from "./refinanciaciones-table";
 
-export default async function RefinanciacionesPage({
-  searchParams,
-}: {
-  searchParams: { q?: string };
-}) {
+export default async function RefinanciacionesPage(
+  props: {
+    searchParams: Promise<{ q?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const user = await getUserFromToken();
   if (!user) redirect("/auth/salir");
 

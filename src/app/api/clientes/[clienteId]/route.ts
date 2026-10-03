@@ -26,10 +26,8 @@ async function getClienteScoped(clienteId: string, user: TokenPayload) {
   return { cliente, forbidden: false };
 }
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { clienteId: string } }
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ clienteId: string }> }) {
+  const params = await props.params;
   const user = await getUserFromToken();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
@@ -46,10 +44,8 @@ export async function GET(
   return NextResponse.json({ ...cliente, prestamos });
 }
 
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: { clienteId: string } }
-) {
+export async function PUT(request: NextRequest, props: { params: Promise<{ clienteId: string }> }) {
+  const params = await props.params;
   const user = await getUserFromToken();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
@@ -85,10 +81,8 @@ export async function PUT(
   return NextResponse.json(actualizado);
 }
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { clienteId: string } }
-) {
+export async function DELETE(request: NextRequest, props: { params: Promise<{ clienteId: string }> }) {
+  const params = await props.params;
   const user = await getUserFromToken();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 

@@ -4,11 +4,12 @@ import { getClientesForUser } from "@/lib/clientes";
 import prisma from "@/libs/prisma";
 import { PrestamoForm } from "./prestamo-form";
 
-export default async function NuevoPrestamoPage({
-  searchParams,
-}: {
-  searchParams: { clienteId?: string };
-}) {
+export default async function NuevoPrestamoPage(
+  props: {
+    searchParams: Promise<{ clienteId?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const user = await getUserFromToken();
   if (!user) redirect("/auth/salir");
 

@@ -7,11 +7,12 @@ function parseList(value?: string) {
   return value ? value.split(",").filter(Boolean) : [];
 }
 
-export default async function SimuladorPage({
-  searchParams,
-}: {
-  searchParams: { tipo?: string; frecuencia?: string; q?: string };
-}) {
+export default async function SimuladorPage(
+  props: {
+    searchParams: Promise<{ tipo?: string; frecuencia?: string; q?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const user = await getUserFromToken();
   if (!user) redirect("/auth/salir");
 

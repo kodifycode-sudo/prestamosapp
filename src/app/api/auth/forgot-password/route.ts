@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "No se pudo enviar el correo" }, { status: 500 });
   }
 
-  const ip = ipDelCliente();
+  const ip = await ipDelCliente();
   if (await superaLimite("RESET", email, ip)) {
     return NextResponse.json(
       {

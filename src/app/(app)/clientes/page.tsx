@@ -3,11 +3,12 @@ import { getUserFromToken } from "@/utils/getUserFromToken";
 import { getClientesForUser } from "@/lib/clientes";
 import { ClientesTable } from "./clientes-table";
 
-export default async function ClientesPage({
-  searchParams,
-}: {
-  searchParams: { q?: string };
-}) {
+export default async function ClientesPage(
+  props: {
+    searchParams: Promise<{ q?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const user = await getUserFromToken();
   if (!user) redirect("/auth/salir");
 

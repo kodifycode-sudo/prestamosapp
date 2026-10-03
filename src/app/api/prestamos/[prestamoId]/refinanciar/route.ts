@@ -21,10 +21,8 @@ const refinanciarSchema = z.object({
 /** Rechazo de negocio detectado dentro de la transacción. */
 class RefinanciacionRechazada extends Error {}
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { prestamoId: string } }
-) {
+export async function POST(request: NextRequest, props: { params: Promise<{ prestamoId: string }> }) {
+  const params = await props.params;
   const user = await getUserFromToken();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 

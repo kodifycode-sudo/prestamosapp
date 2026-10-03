@@ -16,10 +16,8 @@ const usuarioUpdateSchema = z.object({
   password: passwordSchema.optional(),
 });
 
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: { usuarioId: string } }
-) {
+export async function PUT(request: NextRequest, props: { params: Promise<{ usuarioId: string }> }) {
+  const params = await props.params;
   const user = await getUserFromToken();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   if (user.rol !== "ADMIN") return NextResponse.json({ error: "No autorizado" }, { status: 403 });

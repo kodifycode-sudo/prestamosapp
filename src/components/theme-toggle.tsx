@@ -1,16 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { useTheme } from "next-themes";
 import { Moon, Sun } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
+const sinSuscripcion = () => () => {};
+
 export function ThemeToggle({ collapsed = false }: { collapsed?: boolean }) {
   const { resolvedTheme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => setMounted(true), []);
+  // false en el servidor y en la hidratación, true ya en el cliente: el tema
+  // resuelto solo se conoce en el navegador.
+  const mounted = useSyncExternalStore(
+    sinSuscripcion,
+    () => true,
+    () => false
+  );
 
   if (!mounted) {
     return <div className={collapsed ? "size-9" : "h-9"} />;

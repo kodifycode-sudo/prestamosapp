@@ -22,11 +22,12 @@ const estadoVariant: Record<string, "default" | "secondary" | "destructive" | "o
   REFINANCIADO: "outline",
 };
 
-export default async function ClienteDetailPage({
-  params,
-}: {
-  params: { clienteId: string };
-}) {
+export default async function ClienteDetailPage(
+  props: {
+    params: Promise<{ clienteId: string }>;
+  }
+) {
+  const params = await props.params;
   const user = await getUserFromToken();
   if (!user) redirect("/auth/salir");
 

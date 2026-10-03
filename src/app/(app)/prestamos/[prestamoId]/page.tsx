@@ -27,11 +27,12 @@ const estadoVariant: Record<string, "default" | "secondary" | "destructive" | "o
   REFINANCIADO: "outline",
 };
 
-export default async function PrestamoDetailPage({
-  params,
-}: {
-  params: { prestamoId: string };
-}) {
+export default async function PrestamoDetailPage(
+  props: {
+    params: Promise<{ prestamoId: string }>;
+  }
+) {
+  const params = await props.params;
   const user = await getUserFromToken();
   if (!user) redirect("/auth/salir");
 

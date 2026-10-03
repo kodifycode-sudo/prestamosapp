@@ -28,10 +28,8 @@ async function getSimulacionScoped(id: string, user: TokenPayload) {
   return { simulacion, forbidden: false };
 }
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { simulacionId: string } }
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ simulacionId: string }> }) {
+  const params = await props.params;
   const user = await getUserFromToken();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
@@ -42,10 +40,8 @@ export async function GET(
   return NextResponse.json(simulacion);
 }
 
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: { simulacionId: string } }
-) {
+export async function PUT(request: NextRequest, props: { params: Promise<{ simulacionId: string }> }) {
+  const params = await props.params;
   const user = await getUserFromToken();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
@@ -74,10 +70,8 @@ export async function PUT(
   return NextResponse.json(actualizada);
 }
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { simulacionId: string } }
-) {
+export async function DELETE(request: NextRequest, props: { params: Promise<{ simulacionId: string }> }) {
+  const params = await props.params;
   const user = await getUserFromToken();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
