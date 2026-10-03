@@ -26,52 +26,62 @@ export async function getDashboardStats(user: TokenPayload) {
   };
   const diaMes = (fecha: Date) => formatFecha(fecha).slice(0, 5);
 
-  const prestamosActivos = await prisma.prestamo.count({
-    where: { ...scopePrestamo, estado: "ACTIVO" },
-  });
-  const cuotasPendientesActivos = await prisma.cuota.findMany({
-    where: {
-      estado: { not: "PAGADA" },
-      prestamo: { ...scopePrestamo, estado: "ACTIVO" },
-    },
-    select: { montoTotal: true, montoPagado: true },
-  });
-  const pagosHoy = await prisma.pago.aggregate({
-    where: { ...scopePago, fechaPago: rangoHoy },
-    _sum: { monto: true },
-  });
-  const pagosMes = await prisma.pago.aggregate({
-    where: { ...scopePago, fechaPago: rangoMes },
-    _sum: { monto: true },
-  });
-  const cuotasAtrasadas = await prisma.cuota.count({
-    where: {
-      estado: { not: "PAGADA" },
-      fechaVencimiento: { lt: hoy },
-      prestamo: { ...scopePrestamo, estado: "ACTIVO" },
-    },
-  });
-  const proximasCuotas = await prisma.cuota.findMany({
-    where: {
-      estado: { not: "PAGADA" },
-      fechaVencimiento: { gte: hoy, lte: sumarDias(hoy, 7) },
-      prestamo: { ...scopePrestamo, estado: "ACTIVO" },
-    },
-    include: {
-      prestamo: { include: { cliente: { select: { id: true, nombre: true, apellido: true } } } },
-    },
-    orderBy: { fechaVencimiento: "asc" },
-    take: 20,
-  });
-  const pagosUltimos14Dias = await prisma.pago.findMany({
-    where: { ...scopePago, fechaPago: rangoDeDias(sumarDias(hoy, -13), hoy) },
-    select: { monto: true, fechaPago: true },
-  });
+  // Consultas independientes entre sí: se lanzan en paralelo.
+  const [
+    prestamosActivos,
+    cuotasPendientesActivos,
+    pagosHoy,
+    pagosMes,
+    cuotasAtrasadas,
+    proximasCuotas,
+    pagosUltimos14Dias,
+  ] = await Promise.all([
+    prisma.prestamo.count({
+      where: { ...scopePrestamo, estado: "ACTIVO" },
+    }),
+    // Cartera activa = lo que resta cobrar de las cuotas no pagadas, sumado en la base.
+    prisma.cuota.aggregate({
+      where: {
+        estado: { not: "PAGADA" },
+        prestamo: { ...scopePrestamo, estado: "ACTIVO" },
+      },
+      _sum: { montoTotal: true, montoPagado: true },
+    }),
+    prisma.pago.aggregate({
+      where: { ...scopePago, fechaPago: rangoHoy },
+      _sum: { monto: true },
+    }),
+    prisma.pago.aggregate({
+      where: { ...scopePago, fechaPago: rangoMes },
+      _sum: { monto: true },
+    }),
+    prisma.cuota.count({
+      where: {
+        estado: { not: "PAGADA" },
+        fechaVencimiento: { lt: hoy },
+        prestamo: { ...scopePrestamo, estado: "ACTIVO" },
+      },
+    }),
+    prisma.cuota.findMany({
+      where: {
+        estado: { not: "PAGADA" },
+        fechaVencimiento: { gte: hoy, lte: sumarDias(hoy, 7) },
+        prestamo: { ...scopePrestamo, estado: "ACTIVO" },
+      },
+      include: {
+        prestamo: { include: { cliente: { select: { id: true, nombre: true, apellido: true } } } },
+      },
+      orderBy: { fechaVencimiento: "asc" },
+      take: 20,
+    }),
+    prisma.pago.findMany({
+      where: { ...scopePago, fechaPago: rangoDeDias(sumarDias(hoy, -13), hoy) },
+      select: { monto: true, fechaPago: true },
+    }),
+  ]);
 
-  const carteraActiva = cuotasPendientesActivos.reduce(
-    (sum, c) => sum + (Number(c.montoTotal) - Number(c.montoPagado)),
-    0
-  );
+  const carteraActiva =
+    Number(cuotasPendientesActivos._sum.montoTotal ?? 0) - Number(cuotasPendientesActivos._sum.montoPagado ?? 0);
 
   const cobrosPorDiaMap = new Map<string, number>();
   for (let i = 13; i >= 0; i--) {

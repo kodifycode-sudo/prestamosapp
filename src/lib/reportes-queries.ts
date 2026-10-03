@@ -1,4 +1,5 @@
 import { diasEntre, filtroInstantesEntreDias, hoyCalendario, sumarDias } from "@/lib/fechas";
+import { estadoEfectivoPrestamo } from "@/lib/estado-prestamo";
 import prisma from "@/libs/prisma";
 import type { TokenPayload } from "@/utils/getUserFromToken";
 import { scopeEmpresa as scopeUsuario } from "@/lib/scope";
@@ -16,6 +17,7 @@ export type ReporteCartera = {
 };
 
 export async function getReporteCartera(user: TokenPayload): Promise<ReporteCartera> {
+  const hoy = hoyCalendario();
   const prestamos = await prisma.prestamo.findMany({
     where: scopeUsuario(user),
     select: {
@@ -24,7 +26,7 @@ export async function getReporteCartera(user: TokenPayload): Promise<ReporteCart
       tipoInteres: true,
       frecuencia: true,
       usuarioId: true,
-      cuotas: { select: { estado: true, montoTotal: true, montoPagado: true } },
+      cuotas: { select: { estado: true, montoTotal: true, montoPagado: true, fechaVencimiento: true } },
     },
   });
 
@@ -45,10 +47,12 @@ export async function getReporteCartera(user: TokenPayload): Promise<ReporteCart
     const monto = Number(prestamo.monto);
     totalDesembolsado += monto;
 
-    const estadoActual = porEstadoMap.get(prestamo.estado) ?? { cantidad: 0, monto: 0 };
+    // Agrupado por estado efectivo: los ACTIVO con cuotas vencidas figuran como ATRASADO.
+    const estado = estadoEfectivoPrestamo(prestamo.estado, prestamo.cuotas, hoy);
+    const estadoActual = porEstadoMap.get(estado) ?? { cantidad: 0, monto: 0 };
     estadoActual.cantidad += 1;
     estadoActual.monto += monto;
-    porEstadoMap.set(prestamo.estado, estadoActual);
+    porEstadoMap.set(estado, estadoActual);
 
     const tipo = prestamo.tipoInteres ?? "INTERES_FIJO";
     porTipoMap.set(tipo, (porTipoMap.get(tipo) ?? 0) + 1);

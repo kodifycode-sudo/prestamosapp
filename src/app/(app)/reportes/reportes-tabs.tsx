@@ -136,6 +136,7 @@ type PrestamoDetalle = {
   totalAPagar: number;
   saldoPendiente: number;
   estado: string;
+  estadoEfectivo: string;
   frecuencia: string;
   cantidadCuotas: number;
   cliente: { id: string; nombre: string; apellido: string };

@@ -18,6 +18,7 @@ import { PrestamoActions } from "./prestamo-actions";
 import { CuotaRowActions } from "./cuota-row-actions";
 import { Button } from "@/components/ui/button";
 import { RefreshCw } from "lucide-react";
+import { estadoEfectivoPrestamo } from "@/lib/estado-prestamo";
 
 const estadoVariant: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
   ACTIVO: "default",
@@ -61,6 +62,7 @@ export default async function PrestamoDetailPage(
     0
   );
   const puedeRefinanciar = prestamo.estado === "ACTIVO" && saldoPendiente > 0;
+  const estadoEfectivo = estadoEfectivoPrestamo(prestamo.estado, cuotas, hoy);
 
   return (
     <div className="space-y-6">
@@ -88,7 +90,7 @@ export default async function PrestamoDetailPage(
         </div>
         <div className="flex items-center gap-3">
           {prestamo.fuenteIngreso && <Badge variant="outline">{prestamo.fuenteIngreso.nombre}</Badge>}
-          <Badge variant={estadoVariant[prestamo.estado]}>{prestamo.estado}</Badge>
+          <Badge variant={estadoVariant[estadoEfectivo]}>{estadoEfectivo}</Badge>
           {puedeRefinanciar && (
             <Button variant="outline" size="sm" asChild>
               <Link href={`/refinanciaciones/nueva?prestamoId=${prestamo.id}`}>

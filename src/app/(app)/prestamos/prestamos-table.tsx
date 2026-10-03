@@ -33,6 +33,8 @@ type Prestamo = {
   tipoInteres: string | null;
   frecuencia: string;
   estado: string;
+  /** Estado a mostrar: ACTIVO con cuotas vencidas se ve como ATRASADO. */
+  estadoEfectivo: string;
   totalAPagar: number;
   saldoPendiente: number;
   cuotasPagadas: number;
@@ -159,9 +161,11 @@ const columns: ColumnDef<Prestamo>[] = [
   },
   {
     id: "estado",
-    accessorFn: (row) => row.estado,
+    accessorFn: (row) => row.estadoEfectivo,
     header: ({ column }) => <DataTableColumnHeader column={column} title="Estado" />,
-    cell: ({ row }) => <Badge variant={estadoVariant[row.original.estado]}>{row.original.estado}</Badge>,
+    cell: ({ row }) => (
+      <Badge variant={estadoVariant[row.original.estadoEfectivo]}>{row.original.estadoEfectivo}</Badge>
+    ),
     meta: { label: "Estado" },
   },
   {

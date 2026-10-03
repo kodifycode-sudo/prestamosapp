@@ -13,6 +13,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ClienteDetailActions } from "./cliente-detail-actions";
+import { hoyCalendario } from "@/lib/fechas";
+import { estadoEfectivoPrestamo } from "@/lib/estado-prestamo";
 
 const estadoVariant: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
   ACTIVO: "default",
@@ -41,9 +43,16 @@ export default async function ClienteDetailPage(
 
   const prestamos = await prisma.prestamo.findMany({
     where: { clienteId: cliente.id },
-    include: { fuenteIngreso: { select: { id: true, nombre: true } } },
+    include: {
+      fuenteIngreso: { select: { id: true, nombre: true } },
+      cuotas: { select: { estado: true, fechaVencimiento: true } },
+    },
     orderBy: { createdAt: "desc" },
   });
+  const hoy = hoyCalendario();
+  const estadosEfectivos = new Map(
+    prestamos.map((p) => [p.id, estadoEfectivoPrestamo(p.estado, p.cuotas, hoy)])
+  );
 
   return (
     <div className="space-y-6">
@@ -132,7 +141,9 @@ export default async function ClienteDetailPage(
                     )}
                   </TableCell>
                   <TableCell>
-                    <Badge variant={estadoVariant[prestamo.estado]}>{prestamo.estado}</Badge>
+                    <Badge variant={estadoVariant[estadosEfectivos.get(prestamo.id)!]}>
+                      {estadosEfectivos.get(prestamo.id)}
+                    </Badge>
                   </TableCell>
                   <TableCell className="text-right">
                     <Link

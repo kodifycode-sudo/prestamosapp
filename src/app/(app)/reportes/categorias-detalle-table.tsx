@@ -32,6 +32,7 @@ type PrestamoDetalle = {
   totalAPagar: number;
   saldoPendiente: number;
   estado: string;
+  estadoEfectivo: string;
   frecuencia: string;
   cantidadCuotas: number;
   cliente: { id: string; nombre: string; apellido: string };
@@ -124,9 +125,11 @@ const columns: ColumnDef<PrestamoDetalle>[] = [
   },
   {
     id: "estado",
-    accessorFn: (row) => row.estado,
+    accessorFn: (row) => row.estadoEfectivo,
     header: ({ column }) => <DataTableColumnHeader column={column} title="Estado" />,
-    cell: ({ row }) => <Badge variant={estadoVariant[row.original.estado]}>{row.original.estado}</Badge>,
+    cell: ({ row }) => (
+      <Badge variant={estadoVariant[row.original.estadoEfectivo]}>{row.original.estadoEfectivo}</Badge>
+    ),
     meta: { label: "Estado" },
   },
   {
@@ -173,7 +176,7 @@ export function CategoriasDetalleTable({
     [fuentesIngreso]
   );
 
-  const estadoCounts = useMemo(() => countBy(prestamos.map((p) => p.estado)), [prestamos]);
+  const estadoCounts = useMemo(() => countBy(prestamos.map((p) => p.estadoEfectivo)), [prestamos]);
   const fuenteCounts = useMemo(
     () => countBy(prestamos.map((p) => p.fuenteIngreso?.id ?? SIN_CATEGORIA)),
     [prestamos]
@@ -181,7 +184,7 @@ export function CategoriasDetalleTable({
 
   const data = useMemo(() => {
     return prestamos.filter((p) => {
-      if (estadoFiltro.length && !estadoFiltro.includes(p.estado)) return false;
+      if (estadoFiltro.length && !estadoFiltro.includes(p.estadoEfectivo)) return false;
       if (fuenteFiltro.length) {
         const key = p.fuenteIngreso?.id ?? SIN_CATEGORIA;
         if (!fuenteFiltro.includes(key)) return false;

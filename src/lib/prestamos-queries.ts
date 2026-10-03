@@ -2,6 +2,8 @@ import prisma from "@/libs/prisma";
 import type { TokenPayload } from "@/utils/getUserFromToken";
 import { toCountMap } from "@/lib/facets";
 import { scopeEmpresa } from "@/lib/scope";
+import { hoyCalendario } from "@/lib/fechas";
+import { cuotaVencidaImpaga, estadoEfectivoPrestamo, whereEstadoEfectivo } from "@/lib/estado-prestamo";
 
 export type PrestamosFilters = {
   estado?: string[];
@@ -12,10 +14,11 @@ export type PrestamosFilters = {
 };
 
 export async function getPrestamosForUser(user: TokenPayload, filters: PrestamosFilters = {}) {
+  const hoy = hoyCalendario();
   const prestamos = await prisma.prestamo.findMany({
     where: {
       ...scopeEmpresa(user),
-      ...(filters.estado?.length ? { estado: { in: filters.estado as never[] } } : {}),
+      ...(filters.estado?.length ? whereEstadoEfectivo(filters.estado, hoy) : {}),
       ...(filters.tipoInteres?.length ? { tipoInteres: { in: filters.tipoInteres as never[] } } : {}),
       ...(filters.frecuencia?.length ? { frecuencia: { in: filters.frecuencia as never[] } } : {}),
       ...(filters.clienteId ? { clienteId: filters.clienteId } : {}),
@@ -33,7 +36,7 @@ export async function getPrestamosForUser(user: TokenPayload, filters: Prestamos
     include: {
       cliente: { select: { id: true, nombre: true, apellido: true } },
       fuenteIngreso: { select: { id: true, nombre: true } },
-      cuotas: { select: { montoTotal: true, montoPagado: true, estado: true } },
+      cuotas: { select: { montoTotal: true, montoPagado: true, estado: true, fechaVencimiento: true } },
     },
     orderBy: { createdAt: "desc" },
   });
@@ -48,7 +51,8 @@ export async function getPrestamosForUser(user: TokenPayload, filters: Prestamos
     );
     const cuotasPagadas = cuotas.filter((c) => c.estado === "PAGADA").length;
     const cuotasPendientes = cuotas.length - cuotasPagadas;
-    return { ...prestamo, totalAPagar, saldoPendiente, cuotasPagadas, cuotasPendientes };
+    const estadoEfectivo = estadoEfectivoPrestamo(prestamo.estado, cuotas, hoy);
+    return { ...prestamo, estadoEfectivo, totalAPagar, saldoPendiente, cuotasPagadas, cuotasPendientes };
   });
 }
 
@@ -71,8 +75,19 @@ export async function getPrestamosFacetCounts(user: TokenPayload) {
     _count: { _all: true },
   });
 
+  // Los ACTIVO con cuotas vencidas cuentan como ATRASADO (estado calculado, ver lib/estado-prestamo).
+  const activosAtrasados = await prisma.prestamo.count({
+    where: { ...scope, estado: "ACTIVO", cuotas: { some: cuotaVencidaImpaga() } },
+  });
+  const conteoEstado = porEstado.map((r) => ({ value: r.estado as string, count: r._count._all }));
+  const activos = conteoEstado.find((r) => r.value === "ACTIVO");
+  if (activos) activos.count -= activosAtrasados;
+  const atrasados = conteoEstado.find((r) => r.value === "ATRASADO");
+  if (atrasados) atrasados.count += activosAtrasados;
+  else if (activosAtrasados) conteoEstado.push({ value: "ATRASADO", count: activosAtrasados });
+
   return {
-    estado: toCountMap(porEstado.map((r) => ({ value: r.estado, count: r._count._all }))),
+    estado: toCountMap(conteoEstado),
     tipoInteres: toCountMap(porTipo.map((r) => ({ value: r.tipoInteres ?? "INTERES_FIJO", count: r._count._all }))),
     frecuencia: toCountMap(porFrecuencia.map((r) => ({ value: r.frecuencia, count: r._count._all }))),
   };
