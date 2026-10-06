@@ -3,7 +3,7 @@ import { getUserFromToken } from "@/utils/getUserFromToken";
 import { getReporteCartera } from "@/lib/reportes-queries";
 import { renderReportePdf } from "@/lib/pdf/reporte-pdf";
 import { formatMonto } from "@/lib/format";
-import { estadoPrestamoLabel, frecuenciaLabel, tipoInteresLabel } from "@/lib/labels";
+import { estadoPrestamoLabel } from "@/lib/labels";
 
 export const dynamic = "force-dynamic";
 
@@ -33,14 +33,22 @@ export async function GET() {
         ]),
       },
       {
-        titulo: "Préstamos por tipo de interés",
-        columnas: ["Tipo", "Cantidad"],
-        filas: reporte.porTipoInteres.map((r) => [tipoInteresLabel[r.tipo] ?? r.tipo, r.cantidad]),
-      },
-      {
-        titulo: "Préstamos por frecuencia",
-        columnas: ["Frecuencia", "Cantidad"],
-        filas: reporte.porFrecuencia.map((r) => [frecuenciaLabel[r.frecuencia] ?? r.frecuencia, r.cantidad]),
+        titulo: "Total general",
+        columnas: ["", "Capital", "Interés", "Total"],
+        filas: [
+          ["Cobrado", reporte.cobradoCapital, reporte.cobradoInteres],
+          ["Pendiente (activos)", reporte.capitalPendiente, reporte.interesPendiente],
+          [
+            "Total general",
+            reporte.cobradoCapital + reporte.capitalPendiente,
+            reporte.cobradoInteres + reporte.interesPendiente,
+          ],
+        ].map(([label, capital, interes]) => [
+          label,
+          formatMonto(capital),
+          formatMonto(interes),
+          formatMonto(Number(capital) + Number(interes)),
+        ]),
       },
       ...(reporte.porCobrador.length > 0
         ? [

@@ -12,11 +12,24 @@ export type ReporteCartera = {
   carteraPendiente: number;
   capitalPendiente: number;
   interesPendiente: number;
+  /** Lo cobrado por cuotas, separado en capital e interés; con lo pendiente arma el total general. */
+  cobradoCapital: number;
+  cobradoInteres: number;
   porEstado: { estado: string; cantidad: number; monto: number }[];
-  porTipoInteres: { tipo: string; cantidad: number }[];
-  porFrecuencia: { frecuencia: string; cantidad: number }[];
   porCobrador: { cobrador: string; prestamosActivos: number; carteraPendiente: number }[];
 };
+
+/**
+ * Reparte lo pagado de una cuota: cubre primero su interés y recién el excedente amortiza
+ * capital. Es el mismo criterio para lo cobrado y para lo pendiente, así suman el total.
+ */
+function repartirPagado(c: { montoCapital: unknown; montoInteres: unknown; montoPagado: unknown }) {
+  const interes = Number(c.montoInteres);
+  const pagado = Number(c.montoPagado);
+  const aInteres = Math.min(interes, pagado);
+  const aCapital = Math.min(Number(c.montoCapital), Math.max(0, pagado - interes));
+  return { aCapital, aInteres };
+}
 
 export async function getReporteCartera(user: TokenPayload): Promise<ReporteCartera> {
   const hoy = hoyCalendario();
@@ -26,8 +39,6 @@ export async function getReporteCartera(user: TokenPayload): Promise<ReporteCart
       select: {
         estado: true,
         monto: true,
-        tipoInteres: true,
-        frecuencia: true,
         usuarioId: true,
         cuotas: {
           select: {
@@ -48,19 +59,16 @@ export async function getReporteCartera(user: TokenPayload): Promise<ReporteCart
   ]);
 
   const porEstadoMap = new Map<string, { cantidad: number; monto: number }>();
-  const porTipoMap = new Map<string, number>();
-  const porFrecuenciaMap = new Map<string, number>();
   const porCobradorMap = new Map<string, { prestamosActivos: number; carteraPendiente: number }>();
 
   let totalDesembolsado = 0;
   let carteraPendiente = 0;
   let capitalPendiente = 0;
+  let cobradoCapital = 0;
+  let cobradoInteres = 0;
 
   for (const prestamo of prestamos) {
     const monto = Number(prestamo.monto);
-    // Un préstamo anulado fue mal cargado y nunca se entregó: figura en "por estado" pero no
-    // suma al desembolso. Uno cancelado sí: se entregó y se cobró entero de una vez.
-    if (prestamo.estado !== "ANULADO") totalDesembolsado += monto;
 
     // Agrupado por estado efectivo: los ACTIVO con cuotas vencidas figuran como ATRASADO.
     const estado = estadoEfectivoPrestamo(prestamo.estado, prestamo.cuotas, hoy);
@@ -69,23 +77,25 @@ export async function getReporteCartera(user: TokenPayload): Promise<ReporteCart
     estadoActual.monto += monto;
     porEstadoMap.set(estado, estadoActual);
 
-    const tipo = prestamo.tipoInteres ?? "INTERES_FIJO";
-    porTipoMap.set(tipo, (porTipoMap.get(tipo) ?? 0) + 1);
-    porFrecuenciaMap.set(prestamo.frecuencia, (porFrecuenciaMap.get(prestamo.frecuencia) ?? 0) + 1);
+    // Un préstamo anulado fue mal cargado y nunca se entregó: figura en "por estado" pero no
+    // suma al desembolso ni a lo cobrado. Uno cancelado sí: se entregó y se cobró entero.
+    if (prestamo.estado === "ANULADO") continue;
+    totalDesembolsado += monto;
+
+    for (const c of prestamo.cuotas) {
+      const { aCapital, aInteres } = repartirPagado(c);
+      cobradoCapital += aCapital;
+      cobradoInteres += aInteres;
+    }
 
     if (prestamo.estado === "ACTIVO") {
-      const pendiente = prestamo.cuotas.reduce(
-        (sum, c) => (c.estado !== "PAGADA" ? sum + (Number(c.montoTotal) - Number(c.montoPagado)) : sum),
-        0
-      );
-      carteraPendiente += pendiente;
-
-      // Lo pagado de una cuota cubre primero su interés; recién el excedente amortiza capital.
+      let pendiente = 0;
       for (const c of prestamo.cuotas) {
         if (c.estado === "PAGADA") continue;
-        const aCapital = Math.max(0, Number(c.montoPagado) - Number(c.montoInteres));
-        capitalPendiente += Math.max(0, Number(c.montoCapital) - aCapital);
+        pendiente += Number(c.montoTotal) - Number(c.montoPagado);
+        capitalPendiente += Number(c.montoCapital) - repartirPagado(c).aCapital;
       }
+      carteraPendiente += pendiente;
 
       const cobradorActual = porCobradorMap.get(prestamo.usuarioId) ?? {
         prestamosActivos: 0,
@@ -110,12 +120,9 @@ export async function getReporteCartera(user: TokenPayload): Promise<ReporteCart
     capitalPendiente,
     // La cartera pendiente es capital + interés: lo que no es capital es interés por cobrar.
     interesPendiente: carteraPendiente - capitalPendiente,
+    cobradoCapital,
+    cobradoInteres,
     porEstado: Array.from(porEstadoMap.entries()).map(([estado, v]) => ({ estado, ...v })),
-    porTipoInteres: Array.from(porTipoMap.entries()).map(([tipo, cantidad]) => ({ tipo, cantidad })),
-    porFrecuencia: Array.from(porFrecuenciaMap.entries()).map(([frecuencia, cantidad]) => ({
-      frecuencia,
-      cantidad,
-    })),
     porCobrador: Array.from(porCobradorMap.entries())
       .map(([usuarioId, v]) => ({ cobrador: nombrePorId.get(usuarioId) ?? "—", ...v }))
       .sort((a, b) => b.carteraPendiente - a.carteraPendiente),
