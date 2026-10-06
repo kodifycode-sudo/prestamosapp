@@ -11,6 +11,7 @@ export type ReporteCartera = {
   totalCobrado: number;
   carteraPendiente: number;
   capitalPendiente: number;
+  interesPendiente: number;
   porEstado: { estado: string; cantidad: number; monto: number }[];
   porTipoInteres: { tipo: string; cantidad: number }[];
   porFrecuencia: { frecuencia: string; cantidad: number }[];
@@ -107,6 +108,8 @@ export async function getReporteCartera(user: TokenPayload): Promise<ReporteCart
     totalCobrado: Number(totalPagos._sum.monto ?? 0),
     carteraPendiente,
     capitalPendiente,
+    // La cartera pendiente es capital + interés: lo que no es capital es interés por cobrar.
+    interesPendiente: carteraPendiente - capitalPendiente,
     porEstado: Array.from(porEstadoMap.entries()).map(([estado, v]) => ({ estado, ...v })),
     porTipoInteres: Array.from(porTipoMap.entries()).map(([tipo, cantidad]) => ({ tipo, cantidad })),
     porFrecuencia: Array.from(porFrecuenciaMap.entries()).map(([frecuencia, cantidad]) => ({

@@ -16,10 +16,11 @@ export async function GET() {
   const buffer = await renderReportePdf({
     titulo: "Reporte de cartera",
     resumen: [
-      { label: "Total desembolsado", valor: formatMonto(reporte.totalDesembolsado) },
-      { label: "Total cobrado", valor: formatMonto(reporte.totalCobrado) },
-      { label: "Cartera pendiente (activos)", valor: formatMonto(reporte.carteraPendiente) },
-      { label: "Capital pendiente (activos)", valor: formatMonto(reporte.capitalPendiente) },
+      { label: "Total Desembolsado", valor: formatMonto(reporte.totalDesembolsado) },
+      { label: "Total Cobrado (Capital + Interés)", valor: formatMonto(reporte.totalCobrado) },
+      { label: "Cartera Pendiente (Activos)", valor: formatMonto(reporte.carteraPendiente) },
+      { label: "Capital Pendiente (Activos)", valor: formatMonto(reporte.capitalPendiente) },
+      { label: "Interés Pendiente (Activos)", valor: formatMonto(reporte.interesPendiente) },
     ],
     tablas: [
       {
