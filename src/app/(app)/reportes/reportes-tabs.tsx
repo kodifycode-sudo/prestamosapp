@@ -28,7 +28,8 @@ import {
 } from "@/components/ui/table";
 import { DateRangeFilter, type DateRange } from "@/components/date-range-filter";
 import { formatMonto } from "@/lib/format";
-import { estadoPrestamoLabel, frecuenciaLabel, tipoInteresLabel } from "@/lib/labels";
+import { estadoPrestamoLabel } from "@/lib/labels";
+import { Progress } from "@/components/ui/progress";
 import { CategoriasDetalleTable } from "./categorias-detalle-table";
 
 const estadoVariant: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
@@ -46,9 +47,9 @@ type ReporteCartera = {
   carteraPendiente: number;
   capitalPendiente: number;
   interesPendiente: number;
+  cobradoCapital: number;
+  cobradoInteres: number;
   porEstado: { estado: string; cantidad: number; monto: number }[];
-  porTipoInteres: { tipo: string; cantidad: number }[];
-  porFrecuencia: { frecuencia: string; cantidad: number }[];
   porCobrador: { cobrador: string; prestamosActivos: number; carteraPendiente: number }[];
 };
 
@@ -109,6 +110,62 @@ type ReporteProximosVencimientos = {
     monto: number;
   }[];
 };
+
+/** Cobrado + pendiente = total general, separado en capital e interés. */
+function TotalGeneralCard({ cartera }: { cartera: ReporteCartera }) {
+  const filas = [
+    { label: "Cobrado", capital: cartera.cobradoCapital, interes: cartera.cobradoInteres },
+    { label: "Pendiente (activos)", capital: cartera.capitalPendiente, interes: cartera.interesPendiente },
+  ];
+  const totalCapital = cartera.cobradoCapital + cartera.capitalPendiente;
+  const totalInteres = cartera.cobradoInteres + cartera.interesPendiente;
+  const total = totalCapital + totalInteres;
+  const cobrado = cartera.cobradoCapital + cartera.cobradoInteres;
+  const porcentajeCobrado = total > 0 ? Math.round((cobrado / total) * 100) : 0;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Total general</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead />
+              <TableHead className="text-right">Capital</TableHead>
+              <TableHead className="text-right">Interés</TableHead>
+              <TableHead className="text-right">Total</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filas.map((f) => (
+              <TableRow key={f.label}>
+                <TableCell>{f.label}</TableCell>
+                <TableCell className="text-right">{formatMonto(f.capital)}</TableCell>
+                <TableCell className="text-right">{formatMonto(f.interes)}</TableCell>
+                <TableCell className="text-right">{formatMonto(f.capital + f.interes)}</TableCell>
+              </TableRow>
+            ))}
+            <TableRow className="font-semibold">
+              <TableCell>Total general</TableCell>
+              <TableCell className="text-right">{formatMonto(totalCapital)}</TableCell>
+              <TableCell className="text-right">{formatMonto(totalInteres)}</TableCell>
+              <TableCell className="text-right">{formatMonto(total)}</TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+        <div className="space-y-1">
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">Cobrado del total general</span>
+            <span className="font-medium">{porcentajeCobrado}%</span>
+          </div>
+          <Progress value={porcentajeCobrado} />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 function StatTile({ label, valor }: { label: string; valor: string }) {
   return (
@@ -243,31 +300,7 @@ export function ReportesTabs({
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Por tipo y frecuencia</CardTitle>
-            </CardHeader>
-            <CardContent className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="mb-2 text-xs font-medium text-muted-foreground">Tipo de interés</p>
-                {cartera.porTipoInteres.map((r) => (
-                  <div key={r.tipo} className="flex justify-between py-1 text-sm">
-                    <span>{tipoInteresLabel[r.tipo] ?? r.tipo}</span>
-                    <span className="font-medium">{r.cantidad}</span>
-                  </div>
-                ))}
-              </div>
-              <div>
-                <p className="mb-2 text-xs font-medium text-muted-foreground">Frecuencia</p>
-                {cartera.porFrecuencia.map((r) => (
-                  <div key={r.frecuencia} className="flex justify-between py-1 text-sm">
-                    <span>{frecuenciaLabel[r.frecuencia] ?? r.frecuencia}</span>
-                    <span className="font-medium">{r.cantidad}</span>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          <TotalGeneralCard cartera={cartera} />
         </div>
 
         {isAdmin && cartera.porCobrador.length > 0 && (
