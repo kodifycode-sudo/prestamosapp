@@ -33,8 +33,7 @@ export function PrestamoActions({
   if (estado !== "ACTIVO") return null;
 
   async function handleAnular() {
-    if (!confirm("¿Anular este préstamo mal cargado? Deja de contar en el desembolso y la cartera. No se puede deshacer."))
-      return;
+    if (!confirm("¿Está seguro que desea anular el préstamo?")) return;
     setAnulando(true);
     try {
       const res = await fetch(`/api/prestamos/${prestamoId}`, {
