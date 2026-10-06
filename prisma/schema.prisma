@@ -36,6 +36,7 @@ enum EstadoPrestamo {
   ATRASADO
   CANCELADO
   REFINANCIADO
+  ANULADO
 }
 
 enum EstadoCuota {
