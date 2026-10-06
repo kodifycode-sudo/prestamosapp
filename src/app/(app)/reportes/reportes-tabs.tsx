@@ -37,12 +37,14 @@ const estadoVariant: Record<string, "default" | "secondary" | "destructive" | "o
   ATRASADO: "destructive",
   CANCELADO: "outline",
   REFINANCIADO: "outline",
+  ANULADO: "outline",
 };
 
 type ReporteCartera = {
   totalDesembolsado: number;
   totalCobrado: number;
   carteraPendiente: number;
+  capitalPendiente: number;
   porEstado: { estado: string; cantidad: number; monto: number }[];
   porTipoInteres: { tipo: string; cantidad: number }[];
   porFrecuencia: { frecuencia: string; cantidad: number }[];
@@ -201,10 +203,11 @@ export function ReportesTabs({
         <div className="flex justify-end">
           <DescargarPdfButton href="/api/reportes/cartera/pdf" />
         </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatTile label="Total desembolsado" valor={formatMonto(cartera.totalDesembolsado)} />
           <StatTile label="Total cobrado" valor={formatMonto(cartera.totalCobrado)} />
           <StatTile label="Cartera pendiente (activos)" valor={formatMonto(cartera.carteraPendiente)} />
+          <StatTile label="Capital pendiente (activos)" valor={formatMonto(cartera.capitalPendiente)} />
         </div>
 
         <div className="grid gap-4 lg:grid-cols-2">

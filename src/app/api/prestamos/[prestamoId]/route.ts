@@ -9,7 +9,8 @@ export const dynamic = "force-dynamic";
 
 const prestamoUpdateSchema = z.object({
   // ATRASADO no se asigna a mano: se calcula según las cuotas vencidas (lib/estado-prestamo).
-  estado: z.enum(["ACTIVO", "PAGADO", "CANCELADO"]),
+  // CANCELADO tampoco: lo asigna el cobro del saldo total (/api/prestamos/[id]/cancelar).
+  estado: z.enum(["ACTIVO", "PAGADO", "ANULADO"]),
 });
 
 /** Rechazo de negocio detectado dentro de la transacción; se traduce a una respuesta HTTP. */
@@ -55,7 +56,7 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ prest
   const params = await props.params;
   const user = await getUserFromToken();
   if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  // Cambiar el estado a mano (cancelar, dar por pagado, reactivar) es decisión del administrador.
+  // Cambiar el estado a mano (anular, dar por pagado, reactivar) es decisión del administrador.
   if (user.rol !== "ADMIN") return NextResponse.json({ error: "No autorizado" }, { status: 403 });
 
   const { prestamo } = await getPrestamoScoped(params.prestamoId, user);
@@ -84,8 +85,13 @@ export async function PUT(request: NextRequest, props: { params: Promise<{ prest
         if (actual.estado === "REFINANCIADO") {
           throw new OperacionRechazada("No se puede cambiar el estado de un préstamo refinanciado");
         }
-        if (estado === "CANCELADO" && (await tx.pago.count({ where: { prestamoId: prestamo.id } })) > 0) {
-          throw new OperacionRechazada("No se puede cancelar un préstamo con pagos registrados");
+        // Anulado y cancelado son finales: reactivarlos volvería a sumarlos a la cartera.
+        if (actual.estado === "ANULADO" || actual.estado === "CANCELADO") {
+          throw new OperacionRechazada("No se puede cambiar el estado de un préstamo anulado o cancelado");
+        }
+        // Anular es dar de baja un préstamo mal cargado: no puede haber cobrado nada.
+        if (estado === "ANULADO" && (await tx.pago.count({ where: { prestamoId: prestamo.id } })) > 0) {
+          throw new OperacionRechazada("No se puede anular un préstamo con pagos registrados");
         }
         // PAGADO lo asigna el cobro de la última cuota; a mano solo se acepta si ya no queda deuda.
         if (

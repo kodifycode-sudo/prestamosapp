@@ -22,6 +22,7 @@ const estadoVariant: Record<string, "default" | "secondary" | "destructive" | "o
   ATRASADO: "destructive",
   CANCELADO: "outline",
   REFINANCIADO: "outline",
+  ANULADO: "outline",
 };
 
 export default async function ClienteDetailPage(

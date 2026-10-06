@@ -72,9 +72,13 @@ export async function POST(request: NextRequest, props: { params: Promise<{ cuot
       const prestamoActual = await tx.prestamo.findUniqueOrThrow({ where: { id: prestamo.id } });
       const cuotaActual = await tx.cuota.findUniqueOrThrow({ where: { id: cuota.id } });
 
-      if (prestamoActual.estado === "CANCELADO" || prestamoActual.estado === "REFINANCIADO") {
+      if (
+        prestamoActual.estado === "ANULADO" ||
+        prestamoActual.estado === "CANCELADO" ||
+        prestamoActual.estado === "REFINANCIADO"
+      ) {
         throw new PagoRechazado(
-          { error: "No se pueden registrar pagos en un préstamo cancelado o refinanciado" },
+          { error: "No se pueden registrar pagos en un préstamo anulado, cancelado o refinanciado" },
           409
         );
       }

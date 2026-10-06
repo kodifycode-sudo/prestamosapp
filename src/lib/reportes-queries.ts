@@ -10,6 +10,7 @@ export type ReporteCartera = {
   totalDesembolsado: number;
   totalCobrado: number;
   carteraPendiente: number;
+  capitalPendiente: number;
   porEstado: { estado: string; cantidad: number; monto: number }[];
   porTipoInteres: { tipo: string; cantidad: number }[];
   porFrecuencia: { frecuencia: string; cantidad: number }[];
@@ -27,7 +28,16 @@ export async function getReporteCartera(user: TokenPayload): Promise<ReporteCart
         tipoInteres: true,
         frecuencia: true,
         usuarioId: true,
-        cuotas: { select: { estado: true, montoTotal: true, montoPagado: true, fechaVencimiento: true } },
+        cuotas: {
+          select: {
+            estado: true,
+            montoCapital: true,
+            montoInteres: true,
+            montoTotal: true,
+            montoPagado: true,
+            fechaVencimiento: true,
+          },
+        },
       },
     }),
     prisma.pago.aggregate({
@@ -43,10 +53,13 @@ export async function getReporteCartera(user: TokenPayload): Promise<ReporteCart
 
   let totalDesembolsado = 0;
   let carteraPendiente = 0;
+  let capitalPendiente = 0;
 
   for (const prestamo of prestamos) {
     const monto = Number(prestamo.monto);
-    totalDesembolsado += monto;
+    // Un préstamo anulado fue mal cargado y nunca se entregó: figura en "por estado" pero no
+    // suma al desembolso. Uno cancelado sí: se entregó y se cobró entero de una vez.
+    if (prestamo.estado !== "ANULADO") totalDesembolsado += monto;
 
     // Agrupado por estado efectivo: los ACTIVO con cuotas vencidas figuran como ATRASADO.
     const estado = estadoEfectivoPrestamo(prestamo.estado, prestamo.cuotas, hoy);
@@ -65,6 +78,13 @@ export async function getReporteCartera(user: TokenPayload): Promise<ReporteCart
         0
       );
       carteraPendiente += pendiente;
+
+      // Lo pagado de una cuota cubre primero su interés; recién el excedente amortiza capital.
+      for (const c of prestamo.cuotas) {
+        if (c.estado === "PAGADA") continue;
+        const aCapital = Math.max(0, Number(c.montoPagado) - Number(c.montoInteres));
+        capitalPendiente += Math.max(0, Number(c.montoCapital) - aCapital);
+      }
 
       const cobradorActual = porCobradorMap.get(prestamo.usuarioId) ?? {
         prestamosActivos: 0,
@@ -86,6 +106,7 @@ export async function getReporteCartera(user: TokenPayload): Promise<ReporteCart
     totalDesembolsado,
     totalCobrado: Number(totalPagos._sum.monto ?? 0),
     carteraPendiente,
+    capitalPendiente,
     porEstado: Array.from(porEstadoMap.entries()).map(([estado, v]) => ({ estado, ...v })),
     porTipoInteres: Array.from(porTipoMap.entries()).map(([tipo, cantidad]) => ({ tipo, cantidad })),
     porFrecuencia: Array.from(porFrecuenciaMap.entries()).map(([frecuencia, cantidad]) => ({
@@ -120,8 +141,9 @@ export type ReporteCategorias = {
 const SIN_CATEGORIA_KEY = "SIN_CATEGORIA";
 
 export async function getReporteCategorias(user: TokenPayload): Promise<ReporteCategorias> {
+  // Los anulados no se entregaron: no suman capital prestado, interés ni cantidad.
   const prestamos = await prisma.prestamo.findMany({
-    where: scopeUsuario(user),
+    where: { ...scopeUsuario(user), estado: { not: "ANULADO" } },
     select: {
       fuenteIngresoId: true,
       estado: true,

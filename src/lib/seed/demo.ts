@@ -6,7 +6,7 @@ const ADMIN_EMAIL = "admin@prestamos.local";
 const ADMIN_PASSWORD = "admin123";
 
 type MetodoPago = "EFECTIVO" | "TRANSFERENCIA" | "OTRO";
-type EstadoPrestamoFinal = "ACTIVO" | "PAGADO" | "CANCELADO";
+type EstadoPrestamoFinal = "ACTIVO" | "PAGADO" | "CANCELADO" | "ANULADO";
 
 function d(anio: number, mes: number, dia: number) {
   return new Date(anio, mes - 1, dia);
@@ -487,7 +487,7 @@ async function main() {
     await fijarEstadoPrestamo(prestamo.id, "PAGADO");
   }
 
-  // 6) Cancelado tras algunos pagos (préstamo dado de baja / condonado).
+  // 6) Cancelado: el saldo de todas las cuotas cobrado de una vez.
   {
     const { prestamo, cuotas } = await crearPrestamo({
       ...ctxBase,
@@ -499,13 +499,13 @@ async function main() {
       frecuencia: "MENSUAL",
       fechaInicio: d(2026, 1, 20),
     });
-    await pagarPrimeras(cuotas, 3, { ...ctxBase, prestamoId: prestamo.id });
+    await pagarPrimeras(cuotas, cuotas.length, { ...ctxBase, prestamoId: prestamo.id });
     await fijarEstadoPrestamo(prestamo.id, "CANCELADO");
   }
 
-  // 7) Cancelado casi sin pagos.
+  // 7) Anulado: mal cargado, dado de baja sin ningún pago.
   {
-    const { prestamo, cuotas } = await crearPrestamo({
+    const { prestamo } = await crearPrestamo({
       ...ctxBase,
       clienteId: clientes.diego.id,
       fuenteIngresoId: fuentes.compraVenta.id,
@@ -515,8 +515,7 @@ async function main() {
       frecuencia: "MENSUAL",
       fechaInicio: d(2026, 3, 1),
     });
-    await pagarPrimeras(cuotas, 1, { ...ctxBase, prestamoId: prestamo.id });
-    await fijarEstadoPrestamo(prestamo.id, "CANCELADO");
+    await fijarEstadoPrestamo(prestamo.id, "ANULADO");
   }
 
   // 8) Activo con atraso, monto grande.
@@ -611,7 +610,7 @@ async function main() {
     await pagarParcial(cuotas, 2, 0.5, { ...ctxBase, prestamoId: prestamo.id });
   }
 
-  // 14) Cancelado casi sin pagos, sin categorizar.
+  // 14) Cancelado de una vez, sin categorizar.
   {
     const { prestamo, cuotas } = await crearPrestamo({
       ...ctxBase,
@@ -622,7 +621,7 @@ async function main() {
       frecuencia: "MENSUAL",
       fechaInicio: d(2026, 4, 1),
     });
-    await pagarPrimeras(cuotas, 1, { ...ctxBase, prestamoId: prestamo.id });
+    await pagarPrimeras(cuotas, cuotas.length, { ...ctxBase, prestamoId: prestamo.id });
     await fijarEstadoPrestamo(prestamo.id, "CANCELADO");
   }
 

@@ -19,6 +19,7 @@ export async function GET() {
       { label: "Total desembolsado", valor: formatMonto(reporte.totalDesembolsado) },
       { label: "Total cobrado", valor: formatMonto(reporte.totalCobrado) },
       { label: "Cartera pendiente (activos)", valor: formatMonto(reporte.carteraPendiente) },
+      { label: "Capital pendiente (activos)", valor: formatMonto(reporte.capitalPendiente) },
     ],
     tablas: [
       {

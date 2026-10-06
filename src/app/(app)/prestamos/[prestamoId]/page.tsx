@@ -26,6 +26,7 @@ const estadoVariant: Record<string, "default" | "secondary" | "destructive" | "o
   ATRASADO: "destructive",
   CANCELADO: "outline",
   REFINANCIADO: "outline",
+  ANULADO: "outline",
 };
 
 export default async function PrestamoDetailPage(
@@ -99,13 +100,14 @@ export default async function PrestamoDetailPage(
               </Link>
             </Button>
           )}
-          {user.rol === "ADMIN" && (
-            <PrestamoActions
-              prestamoId={prestamo.id}
-              estado={prestamo.estado}
-              tienePagos={cuotas.some((c) => Number(c.montoPagado) > 0)}
-            />
-          )}
+          <PrestamoActions
+            prestamoId={prestamo.id}
+            estado={prestamo.estado}
+            esAdmin={user.rol === "ADMIN"}
+            tienePagos={cuotas.some((c) => Number(c.montoPagado) > 0)}
+            saldoPendiente={Math.round(saldoPendiente)}
+            cuotasPendientes={cuotas.filter((c) => c.estado !== "PAGADA").length}
+          />
         </div>
       </div>
 
@@ -151,11 +153,7 @@ export default async function PrestamoDetailPage(
           <TableBody>
             {cuotas.map((cuota) => {
               const pendiente = Number(cuota.montoTotal) - Number(cuota.montoPagado);
-              const puedeCobrar =
-                cuota.estado !== "PAGADA" &&
-                prestamo.estado !== "CANCELADO" &&
-                prestamo.estado !== "PAGADO" &&
-                prestamo.estado !== "REFINANCIADO";
+              const puedeCobrar = cuota.estado !== "PAGADA" && prestamo.estado === "ACTIVO";
               return (
                 <TableRow key={cuota.id}>
                   <TableCell>{cuota.numero}</TableCell>
